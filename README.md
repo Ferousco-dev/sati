@@ -1,23 +1,837 @@
-# SATI Yoghurt
+# SATI Yoghurt backend
 
-SATI Yoghurt is a digital platform for ordering SATI Yoghurt products online, with support for pickup, delivery, payments, and order tracking.
+The SATI Yoghurt backend is the Go API that powers the SATI Yoghurt ordering platform. It handles customer accounts, sessions, products, categories, carts, orders, payments, pickup and delivery, email notifications, and the admin system. The frontend only talks to this API for business operations, while PostgreSQL remains the source of truth for customers, orders, payments, and store data.
 
-This root only holds this README and the ignore rules. Each part of the product is its own branch of the same remote, cloned into a folder of the same name.
+This repository is the `backend` branch of the SATI Yoghurt remote. The app is the sibling `frontend` clone.
 
-| Folder | Branch | What it is |
-| --- | --- | --- |
-| `frontend` | `frontend` | The Next.js website for customers and the admin dashboard. |
-| `backend` | `backend` | The Go API for authentication, products, orders, payments, delivery, notifications, and store operations. |
+## Stack
+
+Go, PostgreSQL, pgx, Redis, REST API, Paystack for payments, Resend for transactional email, and Cloudflare R2 or equivalent object storage for product and store images.
+
+The API is versioned under `/api/v1`.
+
+The backend is a modular monolith. Business areas are separated into internal modules, but they run as one Go service and one deployable application.
 
 ## Setup
 
-```bash
-git clone --branch main --single-branch https://github.com/Ferousco-dev/sati.git sati
-cd sati
+You need Go, PostgreSQL and Redis available locally.
 
-git clone --branch frontend --single-branch https://github.com/Ferousco-dev/sati.git frontend
+```bash
 git clone --branch backend --single-branch https://github.com/Ferousco-dev/sati.git backend
+cd backend
+
+cp .env.example .env
+
+go mod download
+go run ./cmd/api
 ```
 
-Then follow the README inside each folder. Run git commands, installs, tests, and commits inside the folder that owns the change, never from this root.
+Create the PostgreSQL database before starting the API and run the migrations:
+
+```bash
+createdb sati
+```
+
+Then configure `DATABASE_URL` in `.env`.
+
+Redis is used for features such as rate limiting, caching and temporary state. The API can keep the core ordering system functional without Redis where a feature does not require it.
+
+The development server listens on the configured `PORT`, with `8080` as the default.
+
+## Architecture
+
+```text
+Customer / Admin
+       |
+       v
+    Next.js
+       |
+       v
+ Reverse Proxy
+       |
+       v
+    Go API
+       |
+   +---+---------+----------------+
+   |             |                |
+   v             v                v
+PostgreSQL     Redis         External APIs
+                               |       |
+                            Paystack  Resend
+```
+
+PostgreSQL is the primary source of truth.
+
+Redis is not used as the permanent store for orders or payments.
+
+The API is divided into business modules:
+
+```text
+auth
+users
+products
+categories
+cart
+orders
+payments
+webhooks
+delivery
+notifications
+email
+store
+admin
+analytics
+files
+audit
+```
+
+
+
+## Authentication
+
+SATI uses server-managed sessions instead of storing authentication tokens in browser local storage.
+
+A successful login creates a random session identifier. The browser receives it through a secure HttpOnly cookie, while the backend stores a hash of the session identifier.
+
+Passwords are hashed with Argon2id.
+
+Sessions support:
+
+- Login
+- Logout
+- Remember Me
+- Session expiration
+- Individual session revocation
+- Multiple active sessions
+- Account-level authentication checks
+
+Remember Me does not use a separate authentication system. It creates a longer-lived session.
+
+### Email verification
+
+New customers are created with `email_verified=false`.
+
+Email verification is intentionally not required before a customer can browse or place an order.
+
+The registration flow is:
+
+```text
+Register
+   |
+   v
+Create account
+   |
+   v
+Hash password
+   |
+   v
+Create verification token
+   |
+   v
+Create session
+   |
+   v
+Customer can continue using SATI
+   |
+   v
+Verification email is sent
+```
+
+Verification tokens are:
+
+- Single use
+- Valid for 15 minutes
+- Stored only as hashes
+- Replaced when a new token is requested
+- Rate limited
+
+A new verification email can be requested after 60 seconds.
+
+## Authentication endpoints
+
+
+| Route                                   | What it does                                          |
+| --------------------------------------- | ----------------------------------------------------- |
+| `POST /api/v1/auth/register`            | Creates a customer account and starts a session.      |
+| `POST /api/v1/auth/login`               | Authenticates a customer and creates a session.       |
+| `POST /api/v1/auth/logout`              | Revokes the current session.                          |
+| `GET /api/v1/auth/me`                   | Returns the currently authenticated customer.         |
+| `POST /api/v1/auth/verify-email`        | Verifies an email address using a verification token. |
+| `POST /api/v1/auth/resend-verification` | Creates and sends a new verification email.           |
+| `POST /api/v1/auth/forgot-password`     | Starts the password reset flow.                       |
+| `POST /api/v1/auth/reset-password`      | Sets a new password using a valid reset token.        |
+
+
+
+
+## Roles
+
+SATI has four primary roles:
+
+
+| Role          | Access                                           |
+| ------------- | ------------------------------------------------ |
+| `CUSTOMER`    | Own account, cart, addresses and orders.         |
+| `STAFF(soon)` | Store operations and order management.           |
+| `ADMIN`       | Full store and platform management.              |
+| `RIDER(soon)` | Assigned deliveries and delivery status updates. |
+
+
+Authorization is checked on the backend for every protected resource. A frontend role check is never treated as sufficient authorization.
+
+## Products and categories
+
+Products belong to categories and contain the information required to display and order them.
+
+A product can be:
+
+- Active or inactive
+- Available or unavailable
+- Assigned to a category
+- Given a price
+- Given one or more images
+- Archived without deleting historical order data
+
+The API does not trust product prices sent by the frontend.
+
+When an order is created, the backend loads the current product prices from PostgreSQL and calculates the totals itself.
+
+## Product endpoints
+
+
+| Route                                          | What it does                  |
+| ---------------------------------------------- | ----------------------------- |
+| `GET /api/v1/products`                         | Lists available products.     |
+| `GET /api/v1/products/:id`                     | Returns one product.          |
+| `GET /api/v1/categories`                       | Lists product categories.     |
+| `GET /api/v1/categories/:id/products`          | Lists products in a category. |
+| `POST /api/v1/admin/products`                  | Creates a product.            |
+| `PATCH /api/v1/admin/products/:id`             | Updates a product.            |
+| `POST /api/v1/admin/products/:id/archive`      | Archives a product.           |
+| `POST /api/v1/admin/products/:id/availability` | Changes product availability. |
+
+
+
+
+## Cart and checkout
+
+The customer can add products to a cart and change quantities before checkout.
+
+The frontend can maintain the temporary cart state, but the backend is responsible for validating the cart during checkout.
+
+The checkout request contains product IDs and quantities rather than trusting a client-provided subtotal or total.
+
+The backend:
+
+1. Loads the requested products.
+2. Checks that each product exists.
+3. Checks product availability.
+4. Loads current prices.
+5. Calculates item totals.
+6. Calculates the subtotal.
+7. Calculates delivery fees when applicable.
+8. Applies valid discounts or promotions.
+9. Calculates the final total.
+10. Creates the order and order items inside a transaction.
+
+
+
+## Orders
+
+Orders are independent from payments.
+
+An order records what the customer purchased, the price at the time of purchase, the selected fulfillment method, and the current order state.
+
+Order items store snapshots of the product name and unit price so historical orders do not change when a product is renamed or repriced.
+
+### Order states
+
+```text
+PENDING
+   |
+   v
+CONFIRMED
+   |
+   v
+PREPARING
+   |
+   v
+READY
+   |
+   +--------------------+
+   |                    |
+   v                    v
+PICKUP              OUT_FOR_DELIVERY
+   |                    |
+   v                    v
+COMPLETED            DELIVERED
+```
+
+Orders can also move to exceptional states such as:
+
+```text
+CANCELLED
+FAILED
+```
+
+Payment state is stored separately from order state.
+
+### Payment states
+
+```text
+UNPAID
+PENDING
+PAID
+FAILED
+REFUNDED
+PARTIALLY_REFUNDED
+```
+
+This prevents payment status from being incorrectly inferred from the order status.
+
+## Order endpoints
+
+
+| Route                                   | What it does                                                         |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| `POST /api/v1/orders`                   | Creates an order after validating the cart and checkout information. |
+| `GET /api/v1/orders`                    | Lists the authenticated customer's orders.                           |
+| `GET /api/v1/orders/:id`                | Returns an order owned by the authenticated customer.                |
+| `POST /api/v1/orders/:id/cancel`        | Cancels an eligible order.                                           |
+| `GET /api/v1/orders/:id/status`         | Returns the current order status.                                    |
+| `GET /api/v1/admin/orders`              | Lists store orders for authorized staff.                             |
+| `GET /api/v1/admin/orders/:id`          | Returns an order for staff management.                               |
+| `PATCH /api/v1/admin/orders/:id/status` | Updates an order's preparation or fulfillment status.                |
+
+
+Customers cannot access another customer's order by changing an order ID in a request.
+
+## Addresses
+
+Customers can save delivery addresses for future orders.
+
+An address can contain:
+
+- Recipient name
+- Phone number
+- Address line
+- Area
+- City
+- Additional delivery instructions
+
+The backend validates that an address belongs to the authenticated customer before using it for an order.
+
+## Delivery and pickup
+
+SATI supports both pickup and delivery.
+
+### Pickup
+
+```text
+Order confirmed
+      |
+      v
+Preparing
+      |
+      v
+Ready for pickup
+      |
+      v
+Customer collects
+      |
+      v
+Completed
+```
+
+
+
+### Delivery
+
+```text
+Order confirmed
+      |
+      v
+Preparing
+      |
+      v
+Ready
+      |
+      v
+Rider assigned
+      |
+      v
+Picked up
+      |
+      v
+Out for delivery
+      |
+      v
+Delivered
+```
+
+The initial delivery system supports store-managed delivery with manual rider assignment from the admin dashboard.
+
+Delivery fees are calculated by the backend based on the configured delivery rules or zone.
+
+## Delivery endpoints
+
+
+| Route                                       | What it does                            |
+| ------------------------------------------- | --------------------------------------- |
+| `GET /api/v1/admin/delivery/zones`          | Lists delivery zones.                   |
+| `POST /api/v1/admin/delivery/zones`         | Creates a delivery zone.                |
+| `PATCH /api/v1/admin/delivery/zones/:id`    | Updates a delivery zone.                |
+| `POST /api/v1/admin/orders/:id/rider`       | Assigns a rider to an order.            |
+| `PATCH /api/v1/rider/deliveries/:id/status` | Updates an assigned delivery.           |
+| `GET /api/v1/rider/deliveries`              | Lists deliveries assigned to the rider. |
+
+
+
+
+## Payments
+
+SATI uses Paystack for customer payments.
+
+Payment logic is isolated behind a provider interface so another payment provider can be added without rewriting the order system.
+
+```go
+type PaymentProvider interface {
+    InitializePayment(...)
+    VerifyPayment(...)
+    HandleWebhook(...)
+}
+```
+
+The payment flow is:
+
+```text
+Customer
+   |
+   v
+Next.js
+   |
+   v
+Go API
+   |
+   v
+Create order/payment
+   |
+   v
+Paystack
+   |
+   v
+Customer pays
+   |
+   v
+Paystack webhook
+   |
+   v
+Go API
+   |
+   +--> Verify webhook
+   |
+   +--> Verify transaction
+   |
+   +--> Update payment
+   |
+   +--> Update order
+   |
+   +--> Notify customer
+```
+
+The frontend is never trusted to decide whether a payment succeeded.
+
+The backend verifies the transaction with Paystack before marking the payment as successful.
+
+## Payment endpoints
+
+
+| Route                              | What it does                                         |
+| ---------------------------------- | ---------------------------------------------------- |
+| `POST /api/v1/payments/initialize` | Initializes a payment for an eligible order.         |
+| `GET /api/v1/payments/:reference`  | Returns payment information for an authorized order. |
+| `POST /api/v1/payments/verify`     | Verifies a payment with the payment provider.        |
+| `POST /api/v1/webhooks/paystack`   | Receives and processes Paystack webhook events.      |
+
+
+Webhook processing is idempotent. Receiving the same event more than once must not create another payment or duplicate an order state transition.
+
+Payment secrets are only available to the backend.
+
+## Database
+
+PostgreSQL stores the application's durable state.
+
+The main tables are:
+
+```text
+users
+sessions
+email_verification_tokens
+password_reset_tokens
+
+categories
+products
+
+addresses
+
+orders
+order_items
+
+payments
+payment_events
+
+delivery_zones
+delivery_orders
+
+notifications
+store_settings
+audit_logs
+```
+
+Important constraints and indexes are defined at the database level.
+
+Orders, payments and related state changes use transactions where atomicity is required.
+
+The database is accessed through pgx and explicit SQL rather than an ORM.
+
+## Redis
+
+Redis is used only where temporary or high-speed state provides a clear benefit.
+
+Current use cases include:
+
+- Rate limiting
+- Product/catalog caching
+- Temporary locks
+- Short-lived state
+- Background job coordination
+
+Redis is not the source of truth for orders, payments, customers or balances.
+
+If Redis becomes unavailable, features that do not depend on it should continue operating normally.
+
+## Notifications
+
+SATI sends transactional emails through Resend.
+
+Important emails include:
+
+- Email verification
+- Password reset
+- Order confirmation
+- Payment confirmation
+- Order status changes
+- Order ready for pickup
+- Out-for-delivery notification
+- Delivery confirmation
+
+Email delivery should not block the core order transaction. Where background jobs are enabled, the order is committed first and the notification is processed separately.
+
+## Admin
+
+The admin API provides store operations for authorized staff.
+
+Administrators can:
+
+- Create and edit products
+- Manage categories
+- Change product availability
+- View customers
+- View orders
+- Update order status
+- Manage delivery zones
+- Assign riders
+- View payment status
+- Manage store settings
+- View basic operational statistics
+
+Admin endpoints require an authenticated staff or admin session and the required role.
+
+## Admin endpoints
+
+
+| Route                                | What it does                       |
+| ------------------------------------ | ---------------------------------- |
+| `GET /api/v1/admin/dashboard`        | Returns dashboard statistics.      |
+| `GET /api/v1/admin/orders`           | Lists store orders.                |
+| `GET /api/v1/admin/customers`        | Lists customers.                   |
+| `GET /api/v1/admin/products`         | Lists products for management.     |
+| `POST /api/v1/admin/products`        | Creates a product.                 |
+| `PATCH /api/v1/admin/products/:id`   | Updates a product.                 |
+| `GET /api/v1/admin/categories`       | Lists categories.                  |
+| `POST /api/v1/admin/categories`      | Creates a category.                |
+| `PATCH /api/v1/admin/categories/:id` | Updates a category.                |
+| `GET /api/v1/admin/payments`         | Lists payment records.             |
+| `GET /api/v1/admin/delivery`         | Lists delivery operations.         |
+| `GET /api/v1/admin/audit-logs`       | Lists administrative audit events. |
+
+
+
+
+## Files and images
+
+Product and store images are stored outside PostgreSQL.
+
+The backend generates or manages the object storage references while PostgreSQL stores the metadata required by the application.
+
+The database does not store large binary image files directly.
+
+The frontend receives URLs or signed URLs where appropriate.
+
+## API errors
+
+API responses use a consistent error structure.
+
+```json
+{
+  "error": {
+    "code": "ORDER_NOT_FOUND",
+    "message": "Order not found"
+  }
+}
+```
+
+Error codes are stable and can be consumed by the frontend.
+
+The API does not expose internal database errors, stack traces or provider secrets to clients.
+
+## Environment
+
+See `.env.example`.
+
+The main environment variables are:
+
+```env
+APP_ENV=development
+PORT=8080
+
+DATABASE_URL=postgres://...
+
+REDIS_URL=redis://...
+
+SESSION_SECRET=...
+
+PAYSTACK_SECRET_KEY=...
+PAYSTACK_WEBHOOK_SECRET=...
+
+RESEND_API_KEY=...
+EMAIL_FROM=...
+
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=...
+R2_PUBLIC_URL=...
+```
+
+Production secrets must never be committed to the repository.
+
+The application should refuse to start in production when required secrets are missing.
+
+## Rate limiting
+
+Authentication, payment, webhook and other sensitive endpoints are rate limited.
+
+Rate limits are applied per client IP and, where appropriate, per authenticated account.
+
+Important routes include:
+
+- Registration
+- Login
+- Password reset
+- Email verification
+- Payment initialization
+- Payment verification
+- Admin authentication
+- Public API endpoints
+
+The backend must correctly identify the client IP when running behind the configured reverse proxy.
+
+## Security
+
+The API follows several security rules:
+
+- Passwords use Argon2id.
+- Sessions use secure HttpOnly cookies.
+- Cookies use `Secure` in production.
+- SameSite and CSRF protection are configured for the deployment architecture.
+- SQL queries are parameterized.
+- User input is validated before reaching business logic.
+- Authorization is checked server-side.
+- Payment webhooks are verified.
+- Payment secrets never reach the frontend.
+- Session identifiers are never stored as plaintext in the database.
+- Sensitive values are excluded from logs.
+- Admin actions are recorded in audit logs.
+- Rate limits protect sensitive endpoints.
+
+
+
+## Audit logs
+
+Important administrative and security actions are recorded.
+
+Examples include:
+
+- Product creation
+- Product updates
+- Product archival
+- Order status changes
+- Rider assignment
+- Payment actions
+- Store setting changes
+- Administrative authentication events
+
+Audit logs provide an operational history without exposing sensitive authentication credentials.
+
+## Health
+
+```text
+GET /api/v1/health
+```
+
+The health endpoint checks that the API is running and that required infrastructure is available according to the configured health policy.
+
+The deployment platform uses this endpoint to determine whether the service is ready to receive traffic.
+
+## Scripts
+
+
+| Command               | What it does                       |
+| --------------------- | ---------------------------------- |
+| `go run ./cmd/api`    | Starts the development API.        |
+| `go build ./...`      | Builds all Go packages.            |
+| `go test ./...`       | Runs the test suite.               |
+| `go test -race ./...` | Runs tests with the race detector. |
+| `go vet ./...`        | Runs Go's static analysis checks.  |
+| `gofmt -w .`          | Formats Go source files.           |
+
+
+Database migration commands depend on the migration tool selected for the project and are documented alongside the migration package.
+
+## Testing
+
+The backend tests the important business boundaries rather than only HTTP handlers.
+
+Tests cover:
+
+- Registration
+- Login and logout
+- Session expiration
+- Remember Me
+- Email verification
+- Password reset
+- Product availability
+- Cart validation
+- Order totals
+- Delivery fees
+- Order status transitions
+- Customer authorization
+- Admin authorization
+- Payment initialization
+- Payment verification
+- Invalid payment webhooks
+- Duplicate payment webhooks
+- Order/payment consistency
+- Rider assignment
+- Delivery status transitions
+
+Integration tests use a dedicated PostgreSQL test database.
+
+Payment provider calls should use test credentials or mocked provider implementations during automated tests.
+
+## Project structure
+
+```text
+backend/
+├── cmd/
+│   └── api/
+│       └── main.go
+│
+├── internal/
+│   ├── auth/
+│   ├── users/
+│   ├── products/
+│   ├── categories/
+│   ├── cart/
+│   ├── orders/
+│   ├── payments/
+│   ├── webhooks/
+│   ├── delivery/
+│   ├── notifications/
+│   ├── email/
+│   ├── store/
+│   ├── admin/
+│   ├── analytics/
+│   ├── files/
+│   └── audit/
+│
+├── db/
+│   ├── migrations/
+│   └── queries/
+│
+├── pkg/
+│
+├── .env.example
+├── go.mod
+└── README.md
+```
+
+Each module owns its business logic and exposes only the interfaces other modules actually need.
+
+HTTP handlers should remain thin. Validation, database operations and business rules belong in the appropriate application modules.
+
+## Deployment
+
+The production API run             |
+                            v
+                     Reverse Proxy
+                            |
+                            v
+                         Go API
+                            |
+             +--------------+--------------+
+             |              |              |
+             v              v              v
+        PostgreSQL        Redis        External APIs
+                                          |
+                                   +------+------+
+                                   |             |
+                                Paystack       Resend
+```
+
+The frontend is deployed separately and communicates with the backend through the configured API origin.
+
+The backend can run on Render or another VPS/container platform without changing the application architecture.
+
+Production configuration must provide:
+
+- PostgreSQL connection
+- Redis connection
+- Session secret
+- Paystack credentials
+- Resend credentials
+- Object storage credentials
+- Correct proxy configuration
+- Production CORS configuration
+- Secure cookie configuration
+
+The application must not contain production secrets in source control.
+
+## Development principles
+
+The backend follows a few rules:
+
+1. PostgreSQL is the source of truth.
+2. Never trust prices or payment status from the frontend.
+3. Orders and payments are separate concepts.
+4. Payment webhooks must be idempotent.
+5. Authentication and authorization are different concerns.
+6. Business logic belongs in backend modules, not HTTP handlers.
+7. Redis is optional infrastructure, not the primary database.
+8. Historical orders must remain accurate after product changes.
+9. Sensitive information must not appear in logs.
+10. New infrastructure should only be introduced when the product actually needs it.
+
 
