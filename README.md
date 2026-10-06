@@ -26,13 +26,37 @@ go mod download
 go run ./cmd/api
 ```
 
-Create the PostgreSQL database before starting the API and run the migrations:
+Create the PostgreSQL role and database before starting the API, then run the migrations:
 
 ```bash
-createdb sati
+psql -d postgres -c "CREATE ROLE sati LOGIN PASSWORD 'sati'"
+createdb -O sati sati
+go run ./cmd/migrate up
 ```
 
 Then configure `DATABASE_URL` in `.env`.
+
+### Running with Docker (optional)
+
+Docker is optional. `docker-compose.yml` starts PostgreSQL, Redis and a Caddy reverse proxy (`:8000`, routing `/api/*` to the API and everything else to the frontend) for anyone who prefers containers. The API itself still runs on your machine.
+
+Stop any local PostgreSQL on port 5432 first, or the container cannot bind the port.
+
+```bash
+docker compose up -d
+go run ./cmd/migrate up
+go run ./cmd/api
+```
+
+Open `http://localhost:8000/api/v1/health` to test through the proxy, or `http://localhost:8080/api/v1/health` to hit the API directly.
+
+Stop the containers with:
+
+```bash
+docker compose down
+```
+
+Add `-v` to also delete the database volume.
 
 Redis is used for features such as rate limiting, caching and temporary state. The API can keep the core ordering system functional without Redis where a feature does not require it.
 
