@@ -5,7 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -19,36 +21,85 @@ import (
 const maxDeliveryFeeKobo = 100_000_000
 
 type Settings struct {
-	DeliveryFeeKobo int64     `json:"delivery_fee_kobo"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	DeliveryFeeKobo      int64     `json:"delivery_fee_kobo"`
+	OnlineEnabled        bool      `json:"online_enabled"`
+	BankTransferEnabled  bool      `json:"bank_transfer_enabled"`
+	PayOnPickupEnabled   bool      `json:"pay_on_pickup_enabled"`
+	PayOnDeliveryEnabled bool      `json:"pay_on_delivery_enabled"`
+	BankName             string    `json:"bank_name"`
+	BankAccountNumber    string    `json:"bank_account_number"`
+	BankAccountName      string    `json:"bank_account_name"`
+	WhatsAppNumber       string    `json:"whatsapp_number"`
+	WhatsAppMessage      string    `json:"whatsapp_message"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
+
+type UpdateInput struct {
+	DeliveryFeeKobo      *int64  `json:"delivery_fee_kobo"`
+	OnlineEnabled        *bool   `json:"online_enabled"`
+	BankTransferEnabled  *bool   `json:"bank_transfer_enabled"`
+	PayOnPickupEnabled   *bool   `json:"pay_on_pickup_enabled"`
+	PayOnDeliveryEnabled *bool   `json:"pay_on_delivery_enabled"`
+	BankName             *string `json:"bank_name"`
+	BankAccountNumber    *string `json:"bank_account_number"`
+	BankAccountName      *string `json:"bank_account_name"`
+	WhatsAppNumber       *string `json:"whatsapp_number"`
+	WhatsAppMessage      *string `json:"whatsapp_message"`
+}
+
+func (s Settings) BankTransferReady() bool {
+	return s.BankName != "" && s.BankAccountNumber != "" && s.BankAccountName != ""
+}
+
+const columns = `delivery_fee_kobo, online_enabled, bank_transfer_enabled, pay_on_pickup_enabled,
+	pay_on_delivery_enabled, bank_name, bank_account_number, bank_account_name,
+	whatsapp_number, whatsapp_message, updated_at`
 
 type Repository struct{}
 
 func NewRepository() *Repository { return &Repository{} }
 
 func (Repository) Get(ctx context.Context, db database.DBTX) (Settings, error) {
+	return scan(db.QueryRow(ctx, `SELECT `+columns+` FROM store_settings`))
+}
+
+func scan(row interface{ Scan(...any) error }) (Settings, error) {
 	var s Settings
-	err := db.QueryRow(ctx, `SELECT delivery_fee_kobo, updated_at FROM store_settings`).Scan(&s.DeliveryFeeKobo, &s.UpdatedAt)
+	err := row.Scan(&s.DeliveryFeeKobo, &s.OnlineEnabled, &s.BankTransferEnabled, &s.PayOnPickupEnabled,
+		&s.PayOnDeliveryEnabled, &s.BankName, &s.BankAccountNumber, &s.BankAccountName,
+		&s.WhatsAppNumber, &s.WhatsAppMessage, &s.UpdatedAt)
 	return s, err
 }
 
-func (Repository) Update(ctx context.Context, db database.DBTX, deliveryFee *int64, now time.Time) (Settings, error) {
-	var s Settings
-	err := db.QueryRow(ctx,
-		`UPDATE store_settings SET delivery_fee_kobo = COALESCE($1, delivery_fee_kobo), updated_at = $2
-		 RETURNING delivery_fee_kobo, updated_at`, deliveryFee, now).Scan(&s.DeliveryFeeKobo, &s.UpdatedAt)
-	return s, err
+func (Repository) Update(ctx context.Context, db database.DBTX, in UpdateInput, now time.Time) (Settings, error) {
+	return scan(db.QueryRow(ctx,
+		`UPDATE store_settings SET
+		   delivery_fee_kobo = COALESCE($1, delivery_fee_kobo),
+		   online_enabled = COALESCE($2, online_enabled),
+		   bank_transfer_enabled = COALESCE($3, bank_transfer_enabled),
+		   pay_on_pickup_enabled = COALESCE($4, pay_on_pickup_enabled),
+		   pay_on_delivery_enabled = COALESCE($5, pay_on_delivery_enabled),
+		   bank_name = COALESCE($6, bank_name),
+		   bank_account_number = COALESCE($7, bank_account_number),
+		   bank_account_name = COALESCE($8, bank_account_name),
+		   whatsapp_number = COALESCE($9, whatsapp_number),
+		   whatsapp_message = COALESCE($10, whatsapp_message),
+		   updated_at = $11
+		 RETURNING `+columns,
+		in.DeliveryFeeKobo, in.OnlineEnabled, in.BankTransferEnabled, in.PayOnPickupEnabled,
+		in.PayOnDeliveryEnabled, in.BankName, in.BankAccountNumber, in.BankAccountName,
+		in.WhatsAppNumber, in.WhatsAppMessage, now))
 }
 
 type Handler struct {
 	pool *pgxpool.Pool
 	repo *Repository
 	log  *slog.Logger
+	now  func() time.Time
 }
 
 func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
-	return &Handler{pool: pool, repo: NewRepository(), log: log}
+	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now}
 }
 
 func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
@@ -62,23 +113,85 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		DeliveryFeeKobo *int64 `json:"delivery_fee_kobo"`
-	}
+	var in UpdateInput
 	if err := httpx.DecodeJSON(w, r, &in); err != nil {
 		apierror.Write(w, err)
 		return
 	}
-	if in.DeliveryFeeKobo == nil {
-		apierror.Write(w, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", "No fields to update"))
+	if err := in.normalize(); err != nil {
+		apierror.Write(w, err)
 		return
 	}
-	if *in.DeliveryFeeKobo < 0 || *in.DeliveryFeeKobo > maxDeliveryFeeKobo {
-		apierror.Write(w, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", "delivery_fee_kobo must be between 0 and 100000000"))
-		return
-	}
-	s, err := h.repo.Update(r.Context(), h.pool, in.DeliveryFeeKobo, time.Now())
+	s, err := h.repo.Update(r.Context(), h.pool, in, h.now())
 	h.respond(w, r, map[string]any{"settings": s}, err)
+}
+
+func validation(msg string) *apierror.Error {
+	return apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", msg)
+}
+
+// normalize trims and checks every field that was sent.
+func (in *UpdateInput) normalize() *apierror.Error {
+	if in.DeliveryFeeKobo == nil && in.OnlineEnabled == nil && in.BankTransferEnabled == nil &&
+		in.PayOnPickupEnabled == nil && in.PayOnDeliveryEnabled == nil && in.BankName == nil &&
+		in.BankAccountNumber == nil && in.BankAccountName == nil && in.WhatsAppNumber == nil &&
+		in.WhatsAppMessage == nil {
+		return validation("No fields to update")
+	}
+	if in.DeliveryFeeKobo != nil && (*in.DeliveryFeeKobo < 0 || *in.DeliveryFeeKobo > maxDeliveryFeeKobo) {
+		return validation("delivery_fee_kobo must be between 0 and 100000000")
+	}
+
+	for name, field := range map[string]*string{
+		"bank_name": in.BankName, "bank_account_name": in.BankAccountName,
+	} {
+		if field == nil {
+			continue
+		}
+		*field = strings.TrimSpace(*field)
+		if utf8.RuneCountInString(*field) > 100 {
+			return validation(name + " must be at most 100 characters")
+		}
+	}
+
+	if in.BankAccountNumber != nil {
+		digits, ok := digitsOnly(*in.BankAccountNumber, "")
+		if !ok || (digits != "" && (len(digits) < 6 || len(digits) > 20)) {
+			return validation("bank_account_number must be 6 to 20 digits")
+		}
+		in.BankAccountNumber = &digits
+	}
+	if in.WhatsAppNumber != nil {
+		digits, ok := digitsOnly(*in.WhatsAppNumber, "+")
+		if !ok || (digits != "" && (len(digits) < 8 || len(digits) > 15)) {
+			return validation("whatsapp_number must be an international number with 8 to 15 digits")
+		}
+		in.WhatsAppNumber = &digits
+	}
+	if in.WhatsAppMessage != nil {
+		*in.WhatsAppMessage = strings.TrimSpace(*in.WhatsAppMessage)
+		if utf8.RuneCountInString(*in.WhatsAppMessage) > 300 {
+			return validation("whatsapp_message must be at most 300 characters")
+		}
+	}
+	return nil
+}
+
+// digitsOnly keeps the digits of a number, ignoring spaces, dashes and
+// brackets, and a leading character from allowedPrefix. Anything else is invalid.
+func digitsOnly(raw, allowedPrefix string) (string, bool) {
+	var b strings.Builder
+	for i, c := range strings.TrimSpace(raw) {
+		switch {
+		case c >= '0' && c <= '9':
+			b.WriteRune(c)
+		case i == 0 && strings.ContainsRune(allowedPrefix, c):
+		case c == ' ' || c == '-' || c == '(' || c == ')':
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
 }
 
 func (h *Handler) respond(w http.ResponseWriter, r *http.Request, body any, err error) {

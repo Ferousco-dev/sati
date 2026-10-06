@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
@@ -19,6 +20,9 @@ type Handler struct {
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
 func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+	options := middleware.PublicCache(30*time.Second, time.Minute)
+	mux.Handle("GET /api/v1/checkout/options", options(http.HandlerFunc(h.options)))
+
 	mux.Handle("POST /api/v1/orders", access.Customer(http.HandlerFunc(h.create)))
 	mux.Handle("GET /api/v1/orders", access.Customer(http.HandlerFunc(h.list)))
 	mux.Handle("GET /api/v1/orders/{id}", access.Customer(http.HandlerFunc(h.get)))
@@ -29,6 +33,15 @@ func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
 func customerID(r *http.Request) string {
 	id, _ := auth.IdentityFrom(r.Context())
 	return id.User.ID
+}
+
+func (h *Handler) options(w http.ResponseWriter, r *http.Request) {
+	opts, err := h.svc.CheckoutOptions(r.Context())
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, opts)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {

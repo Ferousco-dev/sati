@@ -204,25 +204,172 @@ func TestDeliveryOrderUsesStoreFee(t *testing.T) {
 	}
 }
 
-func TestPayOnPickupRules(t *testing.T) {
-	e := newOrderEnv(t)
-	body := pickupBody(e.product, 1)
-	body["payment_method"] = "PAY_ON_PICKUP"
-	rec := e.order(t, body, e.customer)
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("pay on pickup: %d %s", rec.Code, rec.Body)
+func (e *orderEnv) settings(t *testing.T, body map[string]any) {
+	t.Helper()
+	if rec := e.do(t, "PATCH", "/api/v1/admin/settings", body, e.admin); rec.Code != http.StatusOK {
+		t.Fatalf("settings %v: %d %s", body, rec.Code, rec.Body)
 	}
-	if o := decode[struct{ Order orders.Order }](t, rec).Order; o.PaymentMethod != orders.PayOnPickup || o.PaymentStatus != "UNPAID" {
-		t.Fatalf("%+v", o)
+}
+
+func TestCashMethodsFollowFulfillment(t *testing.T) {
+	e := newOrderEnv(t)
+	addr := e.address(t, e.customer)
+	delivery := map[string]any{"type": "DELIVERY", "address_id": addr}
+
+	cases := []struct {
+		fulfillment map[string]any
+		method      string
+		want        int
+	}{
+		{map[string]any{"type": "PICKUP"}, "PAY_ON_PICKUP", http.StatusCreated},
+		{map[string]any{"type": "PICKUP"}, "PAY_ON_DELIVERY", http.StatusBadRequest},
+		{delivery, "PAY_ON_DELIVERY", http.StatusCreated},
+		{delivery, "PAY_ON_PICKUP", http.StatusBadRequest},
+	}
+	for _, c := range cases {
+		rec := e.order(t, map[string]any{
+			"items":          []map[string]any{{"product_id": e.product, "quantity": 1}},
+			"fulfillment":    c.fulfillment,
+			"payment_method": c.method,
+		}, e.customer)
+		if rec.Code != c.want {
+			t.Fatalf("%v %s: got %d %s", c.fulfillment["type"], c.method, rec.Code, rec.Body)
+		}
+		if rec.Code == http.StatusCreated {
+			o := decode[struct{ Order orders.Order }](t, rec).Order
+			if o.PaymentStatus != "UNPAID" || o.Status != orders.StatusPending || o.PaymentInstructions != nil {
+				t.Fatalf("cash order: %+v", o)
+			}
+		}
+	}
+}
+
+func TestBankTransferOrder(t *testing.T) {
+	e := newOrderEnv(t)
+	body := pickupBody(e.product, 3)
+	body["payment_method"] = "BANK_TRANSFER"
+
+	if rec := e.order(t, body, e.customer); rec.Code != http.StatusBadRequest || errorCodeOf(t, rec) != "BANK_TRANSFER_NOT_CONFIGURED" {
+		t.Fatalf("unconfigured bank transfer: %d %s", rec.Code, rec.Body)
 	}
 
-	body = map[string]any{
-		"items":          []map[string]any{{"product_id": e.product, "quantity": 1}},
-		"fulfillment":    map[string]any{"type": "DELIVERY", "address_id": e.address(t, e.customer)},
-		"payment_method": "PAY_ON_PICKUP",
+	e.settings(t, map[string]any{
+		"bank_name": "Example Bank", "bank_account_number": "012 345 6789", "bank_account_name": "SATI Yoghurt",
+		"whatsapp_number": "+234 801 234 5678", "whatsapp_message": "Paid for {order_number}, total {total}",
+	})
+	rec := e.order(t, body, e.customer)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("bank transfer: %d %s", rec.Code, rec.Body)
 	}
-	if rec := e.order(t, body, e.customer); rec.Code != http.StatusBadRequest {
-		t.Fatalf("pay on pickup with delivery: %d", rec.Code)
+	o := decode[struct{ Order orders.Order }](t, rec).Order
+	in := o.PaymentInstructions
+	if in == nil || in.AccountNumber != "0123456789" || in.AccountName != "SATI Yoghurt" || in.BankName != "Example Bank" {
+		t.Fatalf("instructions: %+v", in)
+	}
+	if in.Reference != o.Number || in.AmountKobo != 750000 {
+		t.Fatalf("reference or amount: %+v", in)
+	}
+	wantURL := "https://wa.me/2348012345678?text=Paid+for+" + o.Number + "%2C+total+%E2%82%A67%2C500.00"
+	if in.WhatsAppURL != wantURL {
+		t.Fatalf("whatsapp url: %s", in.WhatsAppURL)
+	}
+
+	fetched := decode[struct{ Order orders.Order }](t, e.do(t, "GET", "/api/v1/orders/"+o.ID, nil, e.customer)).Order
+	if fetched.PaymentInstructions == nil {
+		t.Fatal("instructions missing on fetch")
+	}
+	if list := decode[orders.Page](t, e.do(t, "GET", "/api/v1/orders", nil, e.customer)); list.Orders[0].PaymentInstructions == nil {
+		t.Fatal("instructions missing in list")
+	}
+
+	e.settings(t, map[string]any{"whatsapp_number": ""})
+	noLink := decode[struct{ Order orders.Order }](t, e.do(t, "GET", "/api/v1/orders/"+o.ID, nil, e.customer)).Order
+	if noLink.PaymentInstructions == nil || noLink.PaymentInstructions.WhatsAppURL != "" {
+		t.Fatalf("clearing the number must remove the link: %+v", noLink.PaymentInstructions)
+	}
+
+	e.do(t, "POST", "/api/v1/orders/"+o.ID+"/cancel", nil, e.customer)
+	cancelled := decode[struct{ Order orders.Order }](t, e.do(t, "GET", "/api/v1/orders/"+o.ID, nil, e.customer)).Order
+	if cancelled.PaymentInstructions != nil {
+		t.Fatal("cancelled orders must not show payment instructions")
+	}
+}
+
+func TestDisabledPaymentMethods(t *testing.T) {
+	e := newOrderEnv(t)
+	e.settings(t, map[string]any{"online_enabled": false})
+
+	rec := e.order(t, pickupBody(e.product, 1), e.customer)
+	if rec.Code != http.StatusBadRequest || errorCodeOf(t, rec) != "PAYMENT_METHOD_DISABLED" {
+		t.Fatalf("disabled online: %d %s", rec.Code, rec.Body)
+	}
+
+	opts := decode[orders.CheckoutOptions](t, e.do(t, "GET", "/api/v1/checkout/options", nil, nil))
+	for _, m := range opts.PaymentMethods[orders.Pickup] {
+		if m == orders.PayOnline {
+			t.Fatalf("disabled method listed: %+v", opts)
+		}
+	}
+
+	e.settings(t, map[string]any{"online_enabled": true})
+	if rec := e.order(t, pickupBody(e.product, 1), e.customer); rec.Code != http.StatusCreated {
+		t.Fatalf("re-enabled online: %d", rec.Code)
+	}
+}
+
+func TestCheckoutOptions(t *testing.T) {
+	e := newOrderEnv(t)
+	e.settings(t, map[string]any{"delivery_fee_kobo": 200000})
+
+	first := e.do(t, "GET", "/api/v1/checkout/options", nil, nil)
+	if first.Code != http.StatusOK || first.Header().Get("ETag") == "" {
+		t.Fatalf("options: %d %v", first.Code, first.Header())
+	}
+	opts := decode[orders.CheckoutOptions](t, first)
+	if opts.DeliveryFeeKobo != 200000 || opts.Currency != "NGN" {
+		t.Fatalf("options: %+v", opts)
+	}
+	if got := opts.PaymentMethods[orders.Pickup]; len(got) != 2 || got[0] != orders.PayOnline || got[1] != orders.PayOnPickup {
+		t.Fatalf("pickup methods (bank transfer hidden until configured): %v", got)
+	}
+	if got := opts.PaymentMethods[orders.Delivery]; len(got) != 2 || got[1] != orders.PayOnDelivery {
+		t.Fatalf("delivery methods: %v", got)
+	}
+
+	e.settings(t, map[string]any{"bank_name": "B", "bank_account_number": "1234567890", "bank_account_name": "N"})
+	opts = decode[orders.CheckoutOptions](t, e.do(t, "GET", "/api/v1/checkout/options", nil, nil))
+	if len(opts.PaymentMethods[orders.Pickup]) != 3 {
+		t.Fatalf("bank transfer should appear once configured: %v", opts.PaymentMethods)
+	}
+}
+
+func TestSettingsValidationAndAccess(t *testing.T) {
+	e := newOrderEnv(t)
+	staff := e.signIn(t, "staff@example.com", users.RoleStaff)
+
+	if rec := e.do(t, "GET", "/api/v1/admin/settings", nil, staff); rec.Code != http.StatusOK {
+		t.Fatalf("staff read: %d", rec.Code)
+	}
+	if rec := e.do(t, "PATCH", "/api/v1/admin/settings", map[string]any{"bank_name": "X"}, staff); rec.Code != http.StatusForbidden {
+		t.Fatalf("staff write: %d", rec.Code)
+	}
+	if rec := e.do(t, "GET", "/api/v1/admin/settings", nil, e.customer); rec.Code != http.StatusForbidden {
+		t.Fatalf("customer read: %d", rec.Code)
+	}
+
+	invalid := []map[string]any{
+		{},
+		{"delivery_fee_kobo": -1},
+		{"bank_account_number": "12ab"},
+		{"bank_account_number": "123"},
+		{"whatsapp_number": "call me"},
+		{"whatsapp_number": "123"},
+		{"whatsapp_message": string(make([]byte, 301))},
+	}
+	for _, body := range invalid {
+		if rec := e.do(t, "PATCH", "/api/v1/admin/settings", body, e.admin); rec.Code != http.StatusBadRequest {
+			t.Fatalf("%v: got %d", body, rec.Code)
+		}
 	}
 }
 

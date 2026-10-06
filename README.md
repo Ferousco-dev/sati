@@ -382,7 +382,7 @@ Checkout request:
 ```
 
 - `fulfillment.type` is `PICKUP` or `DELIVERY`. Delivery needs `address_id` and uses the flat `delivery_fee_kobo` from store settings until delivery zones exist.
-- `payment_method` is `ONLINE` or `PAY_ON_PICKUP`. `PAY_ON_PICKUP` is only allowed for pickup orders.
+- `payment_method` is one of `ONLINE`, `BANK_TRANSFER`, `PAY_ON_PICKUP` or `PAY_ON_DELIVERY`. Pickup orders can use the first three, delivery orders the first two plus `PAY_ON_DELIVERY`.
 - Sending any price or total is rejected. The same product on several lines is merged. An order holds up to 50 lines and 50 of each product.
 - Send an `Idempotency-Key` header to make retries safe. A repeated key returns the original order with `200` instead of creating another.
 - The order reference is `order_number`, like `SATI-10042`. The UUID `id` is used in URLs.
@@ -414,7 +414,41 @@ Address endpoints require a signed-in customer and only ever touch that customer
 | `PATCH /api/v1/addresses/:id`    | Updates a saved address.      |
 | `DELETE /api/v1/addresses/:id`   | Deletes a saved address.      |
 
-Store settings are managed by the admin API: `GET /api/v1/admin/settings` (STAFF and ADMIN) and `PATCH /api/v1/admin/settings` (ADMIN) for `delivery_fee_kobo`.
+### Payment methods and bank transfer
+
+`GET /api/v1/checkout/options` is public and cached. It returns the delivery fee and the payment methods currently available for `PICKUP` and `DELIVERY`, so the checkout page never offers a method that is switched off.
+
+Bank transfer orders include `payment_instructions` while they are `PENDING` and `UNPAID`:
+
+```json
+{
+  "method": "BANK_TRANSFER",
+  "bank_name": "...",
+  "account_number": "...",
+  "account_name": "...",
+  "reference": "SATI-10042",
+  "amount_kobo": 750000,
+  "whatsapp_url": "https://wa.me/234...?text=..."
+}
+```
+
+The customer pays to the account using the order number as the reference. The frontend can send them to `whatsapp_url`, which opens WhatsApp with a prefilled message. `whatsapp_url` is left out when no WhatsApp number is set.
+
+Cash and bank transfer orders stay `PENDING` and `UNPAID` until staff confirm them and record the payment.
+
+### Store settings
+
+Everything below is changed through the admin API, with no code edits: `GET /api/v1/admin/settings` (STAFF and ADMIN) and `PATCH /api/v1/admin/settings` (ADMIN).
+
+| Field | Purpose |
+| --- | --- |
+| `delivery_fee_kobo` | Flat delivery fee. |
+| `online_enabled`, `bank_transfer_enabled`, `pay_on_pickup_enabled`, `pay_on_delivery_enabled` | Switch each payment method on or off. All are on by default. |
+| `bank_name`, `bank_account_number`, `bank_account_name` | The store's bank account. Bank transfer is only offered once all three are set. |
+| `whatsapp_number` | International number, digits only (a leading `+` and spaces are accepted). |
+| `whatsapp_message` | Message template. `{order_number}` and `{total}` are replaced. |
+
+Orders using a method that is switched off are rejected with `PAYMENT_METHOD_DISABLED`. Turn `online_enabled` off until Paystack is connected.
 
 ## Delivery and pickup
 

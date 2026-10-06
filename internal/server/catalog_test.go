@@ -76,7 +76,9 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories CASCADE`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0`); err != nil {
+	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
+		bank_transfer_enabled = TRUE, pay_on_pickup_enabled = TRUE, pay_on_delivery_enabled = TRUE,
+		bank_name = '', bank_account_number = '', bank_account_name = '', whatsapp_number = ''`); err != nil {
 		t.Fatal(err)
 	}
 

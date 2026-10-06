@@ -57,17 +57,30 @@ func TestValidateCreate(t *testing.T) {
 		t.Fatalf("lines should merge: %v %v", lines, err)
 	}
 
+	delivery := valid()
+	delivery.Fulfillment = FulfillmentInput{Delivery, id}
+	delivery.PaymentMethod = PayOnDelivery
+	if _, err := validateCreate(&delivery); err != nil {
+		t.Fatalf("pay on delivery with delivery rejected: %v", err)
+	}
+	transfer := valid()
+	transfer.PaymentMethod = BankTransfer
+	if _, err := validateCreate(&transfer); err != nil {
+		t.Fatalf("bank transfer rejected: %v", err)
+	}
+
 	bad := map[string]func(*CreateInput){
-		"no items":              func(c *CreateInput) { c.Items = nil },
-		"zero quantity":         func(c *CreateInput) { c.Items[0].Quantity = 0 },
-		"huge quantity":         func(c *CreateInput) { c.Items[0].Quantity = 51 },
-		"merged quantity":       func(c *CreateInput) { c.Items = []LineInput{{id, 30}, {id, 30}} },
-		"bad product id":        func(c *CreateInput) { c.Items[0].ProductID = "abc" },
-		"unknown fulfillment":   func(c *CreateInput) { c.Fulfillment.Type = "TELEPORT" },
-		"delivery no address":   func(c *CreateInput) { c.Fulfillment.Type = Delivery },
-		"pickup with address":   func(c *CreateInput) { c.Fulfillment.AddressID = id },
-		"unknown payment":       func(c *CreateInput) { c.PaymentMethod = "BITCOIN" },
-		"pay on pickup deliver": func(c *CreateInput) { c.Fulfillment = FulfillmentInput{Delivery, id}; c.PaymentMethod = PayOnPickup },
+		"pay on delivery pickup": func(c *CreateInput) { c.PaymentMethod = PayOnDelivery },
+		"no items":               func(c *CreateInput) { c.Items = nil },
+		"zero quantity":          func(c *CreateInput) { c.Items[0].Quantity = 0 },
+		"huge quantity":          func(c *CreateInput) { c.Items[0].Quantity = 51 },
+		"merged quantity":        func(c *CreateInput) { c.Items = []LineInput{{id, 30}, {id, 30}} },
+		"bad product id":         func(c *CreateInput) { c.Items[0].ProductID = "abc" },
+		"unknown fulfillment":    func(c *CreateInput) { c.Fulfillment.Type = "TELEPORT" },
+		"delivery no address":    func(c *CreateInput) { c.Fulfillment.Type = Delivery },
+		"pickup with address":    func(c *CreateInput) { c.Fulfillment.AddressID = id },
+		"unknown payment":        func(c *CreateInput) { c.PaymentMethod = "BITCOIN" },
+		"pay on pickup deliver":  func(c *CreateInput) { c.Fulfillment = FulfillmentInput{Delivery, id}; c.PaymentMethod = PayOnPickup },
 	}
 	for name, mutate := range bad {
 		in := valid()
@@ -79,3 +92,23 @@ func TestValidateCreate(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestFormatNaira(t *testing.T) {
+	tests := map[int64]string{0: "\u20a60.00", 5: "\u20a60.05", 750000: "\u20a67,500.00", 123456789: "\u20a61,234,567.89"}
+	for kobo, want := range tests {
+		if got := formatNaira(kobo); got != want {
+			t.Errorf("%d: got %s, want %s", kobo, got, want)
+		}
+	}
+}
+
+func TestWhatsAppURL(t *testing.T) {
+	got := whatsAppURL("2348012345678", "Paid for {order_number}, total {total}", "SATI-10001", 750000)
+	want := "https://wa.me/2348012345678?text=Paid+for+SATI-10001%2C+total+%E2%82%A67%2C500.00"
+	if got != want {
+		t.Fatalf("got %s", got)
+	}
+	if whatsAppURL("", "x", "SATI-1", 1) != "" {
+		t.Fatal("no number means no link")
+	}
+}

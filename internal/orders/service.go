@@ -107,6 +107,17 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 	for i, l := range lines {
 		ids[i] = l.ProductID
 	}
+	settings, err := s.store.Get(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+	if !methodEnabled(settings, in.PaymentMethod) {
+		return "", ErrMethodDisabled
+	}
+	if in.PaymentMethod == BankTransfer && !settings.BankTransferReady() {
+		return "", ErrBankNotReady
+	}
+
 	found, err := s.repo.LockProducts(ctx, tx, ids)
 	if err != nil {
 		return "", err
@@ -155,10 +166,6 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 		if err != nil {
 			return "", err
 		}
-		settings, err := s.store.Get(ctx, tx)
-		if err != nil {
-			return "", err
-		}
 		order.AddressID = &address.ID
 		order.AddressSnapshot = snapshot
 		order.DeliveryFeeKobo = settings.DeliveryFeeKobo
@@ -198,6 +205,9 @@ func (s *Service) List(ctx context.Context, customerID string, limit, offset int
 			list[i].Items = found
 		}
 	}
+	if err := s.attachInstructions(ctx, list); err != nil {
+		return Page{}, err
+	}
 	return Page{Orders: list, Total: total, Limit: limit, Offset: offset}, nil
 }
 
@@ -233,7 +243,79 @@ func (s *Service) withItems(ctx context.Context, o Order) (Order, error) {
 	if found := items[o.ID]; found != nil {
 		o.Items = found
 	}
-	return o, nil
+	list := []Order{o}
+	if err := s.attachInstructions(ctx, list); err != nil {
+		return Order{}, err
+	}
+	return list[0], nil
+}
+
+// attachInstructions adds the bank details to orders that are still waiting
+// for a transfer. Settings are read once, and only when needed.
+func (s *Service) attachInstructions(ctx context.Context, list []Order) error {
+	var settings *store.Settings
+	for i := range list {
+		o := &list[i]
+		if o.PaymentMethod != BankTransfer || o.Status != StatusPending || o.PaymentStatus != "UNPAID" {
+			continue
+		}
+		if settings == nil {
+			loaded, err := s.store.Get(ctx, s.pool)
+			if err != nil {
+				return err
+			}
+			settings = &loaded
+		}
+		if !settings.BankTransferReady() {
+			continue
+		}
+		o.PaymentInstructions = &PaymentInstructions{
+			Method:        BankTransfer,
+			BankName:      settings.BankName,
+			AccountNumber: settings.BankAccountNumber,
+			AccountName:   settings.BankAccountName,
+			Reference:     o.Number,
+			AmountKobo:    o.TotalKobo,
+			Currency:      Currency,
+			WhatsAppURL:   whatsAppURL(settings.WhatsAppNumber, settings.WhatsAppMessage, o.Number, o.TotalKobo),
+		}
+	}
+	return nil
+}
+
+func methodEnabled(s store.Settings, m PaymentMethod) bool {
+	switch m {
+	case PayOnline:
+		return s.OnlineEnabled
+	case BankTransfer:
+		return s.BankTransferEnabled
+	case PayOnPickup:
+		return s.PayOnPickupEnabled
+	case PayOnDelivery:
+		return s.PayOnDeliveryEnabled
+	}
+	return false
+}
+
+func (s *Service) CheckoutOptions(ctx context.Context) (CheckoutOptions, error) {
+	settings, err := s.store.Get(ctx, s.pool)
+	if err != nil {
+		return CheckoutOptions{}, err
+	}
+	out := CheckoutOptions{
+		DeliveryFeeKobo: settings.DeliveryFeeKobo,
+		PaymentMethods:  map[Fulfillment][]PaymentMethod{Pickup: {}, Delivery: {}},
+		Currency:        Currency,
+	}
+	for _, f := range []Fulfillment{Pickup, Delivery} {
+		for _, m := range MethodsFor(f) {
+			if !methodEnabled(settings, m) || (m == BankTransfer && !settings.BankTransferReady()) {
+				continue
+			}
+			out.PaymentMethods[f] = append(out.PaymentMethods[f], m)
+		}
+	}
+	return out, nil
 }
 
 // validateCreate checks the request shape and merges repeated products into one line.
@@ -278,13 +360,12 @@ func validateCreate(in *CreateInput) ([]LineInput, error) {
 	}
 
 	switch in.PaymentMethod {
-	case PayOnline:
-	case PayOnPickup:
-		if in.Fulfillment.Type != Pickup {
-			return nil, validation("PAY_ON_PICKUP is only available for pickup orders")
+	case PayOnline, BankTransfer, PayOnPickup, PayOnDelivery:
+		if !methodAllowed(in.Fulfillment.Type, in.PaymentMethod) {
+			return nil, validation(string(in.PaymentMethod) + " is not available for " + string(in.Fulfillment.Type) + " orders")
 		}
 	default:
-		return nil, validation("payment_method must be ONLINE or PAY_ON_PICKUP")
+		return nil, validation("payment_method must be ONLINE, BANK_TRANSFER, PAY_ON_PICKUP or PAY_ON_DELIVERY")
 	}
 
 	in.Notes = strings.TrimSpace(in.Notes)
