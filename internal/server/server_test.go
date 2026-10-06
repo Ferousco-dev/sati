@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
+	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 )
 
@@ -22,8 +24,10 @@ func newTestServer(pingErr error) http.Handler {
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	handlers := Handlers{
-		Health: health.New(fakePinger{err: pingErr}),
-		Auth:   auth.NewHandler(nil, log, false),
+		Health:     health.New(fakePinger{err: pingErr}),
+		Auth:       auth.NewHandler(nil, log, false),
+		Categories: categories.NewHandler(nil, log),
+		Products:   products.NewHandler(nil, log),
 	}
 	return New(cfg, log, handlers)
 }

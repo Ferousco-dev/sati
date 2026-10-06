@@ -31,6 +31,9 @@ type Config struct {
 	R2Bucket          string
 	R2PublicURL       string
 
+	StorageDriver string
+	UploadDir     string
+
 	TrustedProxies     []netip.Prefix
 	CORSAllowedOrigins []string
 }
@@ -68,6 +71,9 @@ func Load() (Config, error) {
 		R2Bucket:          os.Getenv("R2_BUCKET"),
 		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 
+		StorageDriver: getenv("STORAGE_DRIVER", "local"),
+		UploadDir:     getenv("UPLOAD_DIR", "uploads"),
+
 		TrustedProxies:     proxies,
 		CORSAllowedOrigins: splitList(os.Getenv("CORS_ALLOWED_ORIGINS")),
 	}
@@ -81,6 +87,9 @@ func Load() (Config, error) {
 func (c Config) validate() error {
 	if c.DatabaseURL == "" {
 		return errors.New("DATABASE_URL is required")
+	}
+	if c.StorageDriver != "local" && c.StorageDriver != "r2" {
+		return errors.New("STORAGE_DRIVER must be local or r2")
 	}
 	if !c.IsProduction() {
 		return nil

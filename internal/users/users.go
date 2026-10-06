@@ -77,3 +77,8 @@ func (r *Repository) SetPassword(ctx context.Context, db database.DBTX, id, pass
 		`UPDATE users SET password_hash = $2, updated_at = $3 WHERE id = $1`, id, passwordHash, at)
 	return err
 }
+
+func (r *Repository) SetRole(ctx context.Context, db database.DBTX, id string, role Role, at time.Time) error {
+	_, err := db.Exec(ctx, `UPDATE users SET role = $2::user_role, updated_at = $3 WHERE id = $1`, id, string(role), at)
+	return err
+}

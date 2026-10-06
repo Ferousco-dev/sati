@@ -233,9 +233,27 @@ When an order is created, the backend loads the current product prices from Post
 | `PATCH /api/v1/admin/products/:id`             | Updates a product.            |
 | `POST /api/v1/admin/products/:id/archive`      | Archives a product.           |
 | `POST /api/v1/admin/products/:id/availability` | Changes product availability. |
+| `POST /api/v1/admin/products/:id/images`       | Uploads a JPEG, PNG or WebP image (max 5MB, form field `image`). |
+| `DELETE /api/v1/admin/products/:id/images/:imageId` | Removes a product image. |
 
 
 
+
+Prices are integers in kobo (`price_kobo`) with `currency` set to `NGN`. List endpoints take `limit` (1-100, default 20) and `offset` and return `total`.
+
+The public product list shows active, non-archived products in active categories, with an `available` flag so the frontend can mark sold-out items.
+
+Images use a storage interface. `STORAGE_DRIVER=local` writes to `UPLOAD_DIR` and serves files from `/api/v1/files/`. The R2 driver is not implemented yet.
+
+### Admin account and sample data
+
+```bash
+ADMIN_PASSWORD='choose-a-password' go run ./cmd/admin create -email you@example.com -name "Your Name"
+go run ./cmd/admin promote -email existing@example.com
+go run ./cmd/seed
+```
+
+`cmd/seed` adds sample categories and products in development only. If `ADMIN_PASSWORD` is not set, the admin command reads the password from stdin.
 
 ## Cart and checkout
 
@@ -765,10 +783,10 @@ Integration tests use a dedicated PostgreSQL test database. They are skipped unl
 
 ```bash
 createdb -O sati sati_test
-TEST_DATABASE_URL="postgres://sati:sati@localhost:5432/sati_test?sslmode=disable" go test ./...
+TEST_DATABASE_URL="postgres://sati:sati@localhost:5432/sati_test?sslmode=disable" go test -p 1 ./...
 ```
 
-The tests truncate the users table, so never point `TEST_DATABASE_URL` at the development database.
+The `-p 1` flag runs packages one at a time because they share the test database. The tests truncate the users table, so never point `TEST_DATABASE_URL` at the development database.
 
 Payment provider calls should use test credentials or mocked provider implementations during automated tests.
 

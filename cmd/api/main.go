@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
+	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/email"
+	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/server"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
@@ -44,9 +47,23 @@ func run() error {
 
 	mailer := email.NewLogMailer(log, !cfg.IsProduction())
 	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
+
+	storage, err := files.NewLocalStorage(cfg.UploadDir)
+	if cfg.StorageDriver != "local" {
+		err = fmt.Errorf("storage driver %q is not implemented yet", cfg.StorageDriver)
+	}
+	if err != nil {
+		return err
+	}
+
+	categorySvc := categories.NewService(categories.NewRepository(pool))
+	productSvc := products.NewService(pool, storage, log)
 	handlers := server.Handlers{
-		Health: health.New(pool),
-		Auth:   auth.NewHandler(authSvc, log, cfg.IsProduction()),
+		Health:     health.New(pool),
+		Auth:       auth.NewHandler(authSvc, log, cfg.IsProduction()),
+		Categories: categories.NewHandler(categorySvc, log),
+		Products:   products.NewHandler(productSvc, log),
+		LocalFiles: storage.Handler(),
 	}
 
 	srv := &http.Server{

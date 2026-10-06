@@ -5,15 +5,22 @@ import (
 	"net/http"
 
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
+	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/products"
+	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
 )
 
 type Handlers struct {
-	Health *health.Handler
-	Auth   *auth.Handler
+	Health     *health.Handler
+	Auth       *auth.Handler
+	Categories *categories.Handler
+	Products   *products.Handler
+	LocalFiles http.Handler
 }
 
 func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
@@ -21,6 +28,16 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
 
 	mux.HandleFunc("GET /api/v1/health", h.Health.Check)
 	h.Auth.Mount(mux)
+
+	admin := func(next http.Handler) http.Handler {
+		return h.Auth.RequireAuth()(auth.RequireRole(users.RoleAdmin)(next))
+	}
+	h.Categories.Mount(mux, admin)
+	h.Products.Mount(mux, admin)
+	if h.LocalFiles != nil {
+		mux.Handle("GET "+files.LocalURLPrefix, h.LocalFiles)
+	}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, apierror.ErrNotFound)
 	})
