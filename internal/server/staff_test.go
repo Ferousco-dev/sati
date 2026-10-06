@@ -144,6 +144,12 @@ func TestDeliveryLifecycleRecordsCashOnDelivery(t *testing.T) {
 	if rec := e.setStatus(t, o.ID, "COMPLETED", ""); rec.Code != http.StatusConflict {
 		t.Fatalf("delivery cannot be COMPLETED: %d", rec.Code)
 	}
+	if rec := e.setStatus(t, o.ID, "OUT_FOR_DELIVERY", ""); rec.Code != http.StatusConflict || errorCodeOf(t, rec) != "RIDER_REQUIRED" {
+		t.Fatalf("no rider assigned: %d %s", rec.Code, rec.Body)
+	}
+	rider := e.signIn(t, "rider@example.com", users.RoleRider)
+	_ = rider
+	e.assign(t, o.ID, e.userID(t, "rider@example.com"))
 	e.mustSetStatus(t, o.ID, "OUT_FOR_DELIVERY")
 	done := e.mustSetStatus(t, o.ID, "DELIVERED")
 	if done.PaymentStatus != "PAID" || len(done.Payments) != 1 {

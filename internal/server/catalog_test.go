@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
@@ -47,9 +49,10 @@ func (m *captureMailer) SendInvite(_ context.Context, _, email string, _ users.R
 }
 
 type catalogEnv struct {
-	srv    http.Handler
-	mailer *captureMailer
-	exec   func(query string, args ...any)
+	srv      http.Handler
+	queryRow func(query string, args ...any) pgx.Row
+	mailer   *captureMailer
+	exec     func(query string, args ...any)
 }
 
 func newCatalogEnv(t *testing.T) *catalogEnv {
@@ -76,7 +79,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories CASCADE`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
@@ -108,11 +111,16 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Store:      store.NewHandler(pool, log),
 		Payments:   payments.NewHandler(pool, log),
 		Analytics:  analytics.NewHandler(analytics.NewService(pool, lagos), log),
+		Zones:      delivery.NewZoneHandler(pool, log),
+		Deliveries: delivery.NewHandler(pool, log),
 		LocalFiles: storage.Handler(),
 	}
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 
 	return &catalogEnv{
+		queryRow: func(query string, args ...any) pgx.Row {
+			return pool.QueryRow(context.Background(), query, args...)
+		},
 		srv:    New(cfg, log, handlers),
 		mailer: mailer,
 		exec: func(query string, args ...any) {

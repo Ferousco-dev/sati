@@ -15,8 +15,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
+	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
+	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 )
@@ -34,6 +36,9 @@ type Service struct {
 	addresses *addresses.Repository
 	store     *store.Repository
 	payments  *payments.Repository
+	zones     *delivery.ZoneRepository
+	delivery  *delivery.Repository
+	users     *users.Repository
 	now       func() time.Time
 }
 
@@ -44,6 +49,9 @@ func NewService(pool *pgxpool.Pool) *Service {
 		addresses: addresses.NewRepository(),
 		store:     store.NewRepository(),
 		payments:  payments.NewRepository(),
+		zones:     delivery.NewZoneRepository(),
+		delivery:  delivery.NewRepository(),
+		users:     users.NewRepository(),
 		now:       time.Now,
 	}
 }
@@ -171,11 +179,39 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 		}
 		order.AddressID = &address.ID
 		order.AddressSnapshot = snapshot
-		order.DeliveryFeeKobo = settings.DeliveryFeeKobo
+		fee, err := s.deliveryFee(ctx, tx, address, settings)
+		if err != nil {
+			return "", err
+		}
+		order.DeliveryFeeKobo = fee
 	}
 	order.TotalKobo = order.SubtotalKobo + order.DeliveryFeeKobo
 
 	return s.repo.Insert(ctx, tx, order, items)
+}
+
+// deliveryFee uses the fee of the zone chosen on the address. A store that
+// has not set up any zones yet falls back to the flat fee in its settings.
+func (s *Service) deliveryFee(ctx context.Context, tx pgx.Tx, address addresses.Address, settings store.Settings) (int64, error) {
+	if address.ZoneID != "" {
+		zone, err := s.zones.GetShared(ctx, tx, address.ZoneID)
+		if err != nil {
+			return 0, err
+		}
+		if !zone.Active {
+			return 0, ErrZoneUnavailable
+		}
+		return zone.FeeKobo, nil
+	}
+
+	active, err := s.zones.CountActive(ctx, tx)
+	if err != nil {
+		return 0, err
+	}
+	if active > 0 {
+		return 0, ErrZoneRequired
+	}
+	return settings.DeliveryFeeKobo, nil
 }
 
 func (s *Service) Get(ctx context.Context, customerID, id string) (Order, error) {
@@ -305,8 +341,13 @@ func (s *Service) CheckoutOptions(ctx context.Context) (CheckoutOptions, error) 
 	if err != nil {
 		return CheckoutOptions{}, err
 	}
+	zones, err := s.zones.List(ctx, s.pool, true)
+	if err != nil {
+		return CheckoutOptions{}, err
+	}
 	out := CheckoutOptions{
 		DeliveryFeeKobo: settings.DeliveryFeeKobo,
+		DeliveryZones:   zones,
 		PaymentMethods:  map[Fulfillment][]PaymentMethod{Pickup: {}, Delivery: {}},
 		Currency:        Currency,
 	}

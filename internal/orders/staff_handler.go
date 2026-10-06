@@ -13,6 +13,8 @@ func (h *Handler) MountStaff(mux *http.ServeMux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/orders", access.Staff(http.HandlerFunc(h.staffList)))
 	mux.Handle("GET /api/v1/admin/orders/{id}", access.Staff(http.HandlerFunc(h.staffGet)))
 	mux.Handle("PATCH /api/v1/admin/orders/{id}/status", access.Staff(http.HandlerFunc(h.changeStatus)))
+	mux.Handle("POST /api/v1/admin/orders/{id}/rider", access.Staff(http.HandlerFunc(h.assignRider)))
+	mux.Handle("PATCH /api/v1/rider/deliveries/{id}/status", access.Rider(http.HandlerFunc(h.riderStatus)))
 	mux.Handle("POST /api/v1/admin/orders/{id}/payment", access.Staff(http.HandlerFunc(h.recordPayment)))
 }
 
@@ -91,4 +93,38 @@ func (h *Handler) recordPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apierror.JSON(w, http.StatusOK, map[string]any{"order": o})
+}
+
+func (h *Handler) assignRider(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		RiderID string `json:"rider_id"`
+		Notes   string `json:"notes"`
+	}
+	if err := httpx.DecodeJSON(w, r, &in); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	o, err := h.svc.AssignRider(r.Context(), userID(r), r.PathValue("id"), in.RiderID, in.Notes)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, map[string]any{"order": o})
+}
+
+func (h *Handler) riderStatus(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Status string `json:"status"`
+		Reason string `json:"reason"`
+	}
+	if err := httpx.DecodeJSON(w, r, &in); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	update, err := h.svc.RiderUpdateStatus(r.Context(), userID(r), r.PathValue("id"), in.Status, in.Reason)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, update)
 }

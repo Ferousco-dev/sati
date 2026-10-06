@@ -51,6 +51,29 @@ func (s *Service) ListUsers(ctx context.Context, role users.Role, limit, offset 
 	return UserPage{Users: list, Total: total, Limit: limit, Offset: offset}, err
 }
 
+type Rider struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (s *Service) ListRiders(ctx context.Context) ([]Rider, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id::text, name FROM users WHERE role = 'RIDER' ORDER BY name, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []Rider{}
+	for rows.Next() {
+		var r Rider
+		if err := rows.Scan(&r.ID, &r.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (s *Service) Invite(ctx context.Context, name, email string, role users.Role) (users.User, error) {
 	return s.auth.Invite(ctx, name, email, role)
 }
@@ -138,6 +161,7 @@ type Handler struct {
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
 func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+	mux.Handle("GET /api/v1/admin/riders", access.Staff(http.HandlerFunc(h.riders)))
 	mux.Handle("GET /api/v1/admin/customers", access.Admin(http.HandlerFunc(h.customers)))
 	mux.Handle("GET /api/v1/admin/users", access.Admin(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/v1/admin/users", access.Admin(http.HandlerFunc(h.invite)))
@@ -162,6 +186,11 @@ func (h *Handler) customers(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := h.svc.ListCustomers(r.Context(), r.URL.Query().Get("q"), limit, offset)
 	h.respond(w, r, http.StatusOK, page, err)
+}
+
+func (h *Handler) riders(w http.ResponseWriter, r *http.Request) {
+	list, err := h.svc.ListRiders(r.Context())
+	h.respond(w, r, http.StatusOK, map[string]any{"riders": list}, err)
 }
 
 func (h *Handler) invite(w http.ResponseWriter, r *http.Request) {

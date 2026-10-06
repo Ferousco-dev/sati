@@ -37,6 +37,12 @@ func (s *Service) Create(ctx context.Context, userID string, in CreateInput) (Ad
 	}
 	in.Phone = phone
 
+	if in.ZoneID != "" {
+		if err := s.checkZone(ctx, in.ZoneID); err != nil {
+			return Address{}, err
+		}
+	}
+
 	n, err := s.repo.Count(ctx, s.pool, userID)
 	if err != nil {
 		return Address{}, err
@@ -51,7 +57,7 @@ func (s *Service) Update(ctx context.Context, userID, id string, in UpdateInput)
 	if !httpx.ValidUUID(id) {
 		return Address{}, ErrNotFound
 	}
-	if in.RecipientName == nil && in.Phone == nil && in.AddressLine == nil && in.Area == nil && in.City == nil && in.Instructions == nil {
+	if in.RecipientName == nil && in.Phone == nil && in.AddressLine == nil && in.Area == nil && in.City == nil && in.Instructions == nil && in.ZoneID == nil {
 		return Address{}, validation("No fields to update")
 	}
 
@@ -87,6 +93,11 @@ func (s *Service) Update(ctx context.Context, userID, id string, in UpdateInput)
 			return Address{}, err
 		}
 	}
+	if in.ZoneID != nil && *in.ZoneID != "" {
+		if err := s.checkZone(ctx, *in.ZoneID); err != nil {
+			return Address{}, err
+		}
+	}
 	return s.repo.Update(ctx, s.pool, userID, id, in, s.now())
 }
 
@@ -119,4 +130,15 @@ func validateAll(name, phone, line, area, city, instructions string) (string, er
 		}
 	}
 	return cleaned, nil
+}
+
+func (s *Service) checkZone(ctx context.Context, zoneID string) error {
+	active, err := s.repo.ZoneActive(ctx, s.pool, zoneID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return ErrZone
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
@@ -29,6 +30,7 @@ type StaffOrder struct {
 	Order
 	Customer CustomerRef        `json:"customer"`
 	Payments []payments.Payment `json:"payments,omitempty"`
+	Delivery *delivery.Delivery `json:"delivery"`
 }
 
 type StaffFilter struct {
@@ -187,9 +189,17 @@ func (s *Service) StaffList(ctx context.Context, f StaffFilter) (StaffPage, erro
 	if err != nil {
 		return StaffPage{}, err
 	}
+	deliveries, err := s.delivery.ForOrders(ctx, s.pool, ids)
+	if err != nil {
+		return StaffPage{}, err
+	}
 	for i := range list {
 		if found := items[list[i].ID]; found != nil {
 			list[i].Items = found
+		}
+		if d, ok := deliveries[list[i].ID]; ok {
+			d := d
+			list[i].Delivery = &d
 		}
 	}
 	return StaffPage{Orders: list, Total: total, Limit: f.Limit, Offset: f.Offset}, nil
@@ -219,6 +229,11 @@ func (s *Service) staffGet(ctx context.Context, db database.DBTX, id string) (St
 		return StaffOrder{}, err
 	}
 	o.Payments = paid[id]
+	if o.Fulfillment == Delivery {
+		if o.Delivery, err = s.delivery.ByOrder(ctx, db, id, false); err != nil {
+			return StaffOrder{}, err
+		}
+	}
 	return o, nil
 }
 
@@ -257,23 +272,31 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID, id string, to Statu
 			return ErrPaymentRequired
 		}
 
+		if err := s.syncDelivery(ctx, tx, id, cur, to, reason, now); err != nil {
+			return err
+		}
 		if err := s.repo.setStatus(ctx, tx, id, to, reason, now); err != nil {
 			return err
 		}
-
-		cash := cur.Method == PayOnPickup || cur.Method == PayOnDelivery
-		if cash && cur.PaymentStatus != "PAID" && (to == StatusCompleted || to == StatusDelivered) {
-			if err := s.payments.InsertManualPaid(ctx, tx, id, string(cur.Method), cur.TotalKobo, actorID, "Cash collected", now); err != nil {
-				return err
-			}
-			if err := s.repo.setPaid(ctx, tx, id, now); err != nil {
-				return err
-			}
+		if err := s.collectCash(ctx, tx, id, cur, to, actorID, now); err != nil {
+			return err
 		}
 		result, err = s.staffGet(ctx, tx, id)
 		return err
 	})
 	return result, err
+}
+
+// collectCash records a cash order as paid once it is handed over.
+func (s *Service) collectCash(ctx context.Context, tx pgx.Tx, id string, cur lockedOrder, to Status, actorID string, now time.Time) error {
+	cash := cur.Method == PayOnPickup || cur.Method == PayOnDelivery
+	if !cash || cur.PaymentStatus == "PAID" || (to != StatusCompleted && to != StatusDelivered) {
+		return nil
+	}
+	if err := s.payments.InsertManualPaid(ctx, tx, id, string(cur.Method), cur.TotalKobo, actorID, "Cash collected", now); err != nil {
+		return err
+	}
+	return s.repo.setPaid(ctx, tx, id, now)
 }
 
 // RecordPayment marks money received by hand, such as a bank transfer

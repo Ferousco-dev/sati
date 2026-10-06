@@ -500,22 +500,33 @@ Delivered
 
 The initial delivery system supports store-managed delivery with manual rider assignment from the admin dashboard.
 
-Delivery fees are calculated by the backend based on the configured delivery rules or zone.
+### Zones and fees
+
+Admins create delivery zones, each with a name and a fee in kobo. A customer picks a zone on the address (`zone_id`), and a delivery order uses that zone's fee. The price is read inside the order transaction, so a fee change never affects an order already placed. If the store has no active zones yet, the flat `delivery_fee_kobo` from settings is used instead. Once zones exist, a delivery address without a zone is rejected with `ADDRESS_ZONE_REQUIRED`.
+
+`GET /api/v1/checkout/options` also returns the active zones, so checkout needs one request.
+
+### Riders
+
+- STAFF or ADMIN assigns a rider to a delivery order once it is `CONFIRMED`, until it goes out. Reassigning is allowed until the rider picks it up.
+- The rider sees only their own jobs, with the address, the customer name and how much cash to collect.
+- The rider drives the order: `PICKED_UP` moves the order to `OUT_FOR_DELIVERY` (it must be `READY`), and `DELIVERED` moves it to `DELIVERED`. Cash on delivery is recorded as collected by that rider.
+- If staff move an order by hand, the delivery record follows. Sending an order out needs an assigned rider.
+- A rider reports `FAILED` with a reason. The order stays `OUT_FOR_DELIVERY` and the delivery shows `FAILED`. Staff then either reassign it (the order returns to `READY` for another attempt) or fail or cancel the order with a reason.
 
 ## Delivery endpoints
 
-
-| Route                                       | What it does                            |
-| ------------------------------------------- | --------------------------------------- |
-| `GET /api/v1/admin/delivery/zones`          | Lists delivery zones.                   |
-| `POST /api/v1/admin/delivery/zones`         | Creates a delivery zone.                |
-| `PATCH /api/v1/admin/delivery/zones/:id`    | Updates a delivery zone.                |
-| `POST /api/v1/admin/orders/:id/rider`       | Assigns a rider to an order.            |
-| `PATCH /api/v1/rider/deliveries/:id/status` | Updates an assigned delivery.           |
-| `GET /api/v1/rider/deliveries`              | Lists deliveries assigned to the rider. |
-
-
-
+| Route                                       | Who          | What it does                                           |
+| ------------------------------------------- | ------------ | ------------------------------------------------------ |
+| `GET /api/v1/delivery/zones`                | public       | Lists active zones with fees. Cached.                  |
+| `GET /api/v1/admin/delivery/zones`          | STAFF, ADMIN | Lists all zones.                                       |
+| `POST /api/v1/admin/delivery/zones`         | ADMIN        | Creates a zone.                                        |
+| `PATCH /api/v1/admin/delivery/zones/:id`    | ADMIN        | Renames, reprices or switches a zone on or off.        |
+| `GET /api/v1/admin/riders`                  | STAFF, ADMIN | Lists users with the RIDER role.                       |
+| `POST /api/v1/admin/orders/:id/rider`       | STAFF, ADMIN | Assigns or reassigns a rider.                          |
+| `GET /api/v1/admin/delivery`                | STAFF, ADMIN | Lists deliveries. Filters: `status`, `rider_id`.       |
+| `GET /api/v1/rider/deliveries`              | RIDER        | The rider's active jobs. `?status=all` adds finished ones. |
+| `PATCH /api/v1/rider/deliveries/:id/status` | RIDER        | Moves their own delivery to `PICKED_UP`, `DELIVERED` or `FAILED`. |
 
 ## Payments
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
+	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 )
 
@@ -66,6 +67,7 @@ type CheckoutOptions struct {
 	DeliveryFeeKobo int64                           `json:"delivery_fee_kobo"`
 	PaymentMethods  map[Fulfillment][]PaymentMethod `json:"payment_methods"`
 	Currency        string                          `json:"currency"`
+	DeliveryZones   []delivery.Zone                 `json:"delivery_zones"`
 }
 
 type Order struct {
@@ -116,6 +118,8 @@ var (
 	ErrNotCancellable  = apierror.New(http.StatusConflict, "ORDER_NOT_CANCELLABLE", "This order can no longer be cancelled")
 	ErrProductNotFound = apierror.New(http.StatusBadRequest, "PRODUCT_NOT_FOUND", "One or more products do not exist")
 	ErrMethodDisabled  = apierror.New(http.StatusBadRequest, "PAYMENT_METHOD_DISABLED", "This payment method is not available right now")
+	ErrZoneRequired    = apierror.New(http.StatusBadRequest, "ADDRESS_ZONE_REQUIRED", "Choose a delivery zone for this address")
+	ErrZoneUnavailable = apierror.New(http.StatusConflict, "ZONE_UNAVAILABLE", "Delivery to this zone is not available right now")
 	ErrBankNotReady    = apierror.New(http.StatusBadRequest, "BANK_TRANSFER_NOT_CONFIGURED", "Bank transfer is not available right now")
 	ErrAddressRequired = apierror.New(http.StatusBadRequest, "ADDRESS_REQUIRED", "A delivery address is required for delivery orders")
 )
