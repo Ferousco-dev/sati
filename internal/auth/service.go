@@ -29,6 +29,7 @@ var (
 type Mailer interface {
 	SendVerification(ctx context.Context, name, email, token string) error
 	SendPasswordReset(ctx context.Context, name, email, token string) error
+	SendInvite(ctx context.Context, name, email string, role users.Role, token string) error
 }
 
 type Settings struct {
@@ -36,6 +37,7 @@ type Settings struct {
 	RememberTTL    time.Duration
 	VerifyTTL      time.Duration
 	ResetTTL       time.Duration
+	InviteTTL      time.Duration
 	ResendCooldown time.Duration
 	TouchAfter     time.Duration
 }
@@ -46,6 +48,7 @@ func DefaultSettings() Settings {
 		RememberTTL:    30 * 24 * time.Hour,
 		VerifyTTL:      15 * time.Minute,
 		ResetTTL:       time.Hour,
+		InviteTTL:      72 * time.Hour,
 		ResendCooldown: 60 * time.Second,
 		TouchAfter:     time.Hour,
 	}
@@ -267,12 +270,65 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		if err := s.users.SetPassword(ctx, tx, userID, passwordHash, now); err != nil {
 			return err
 		}
+		if err := s.users.MarkEmailVerified(ctx, tx, userID, now); err != nil {
+			return err
+		}
 		return s.store.revokeAllSessions(ctx, tx, userID, now)
 	})
 	if errors.Is(err, errNoRow) {
 		return ErrInvalidToken
 	}
 	return err
+}
+
+// Invite creates an account with an unusable password and emails a link
+// to set one, using the same single-use token flow as password reset.
+func (s *Service) Invite(ctx context.Context, name, email string, role users.Role) (users.User, error) {
+	if role == users.RoleCustomer || !role.Valid() {
+		return users.User{}, validationError("Role must be STAFF, RIDER or ADMIN")
+	}
+	name = strings.TrimSpace(name)
+	if n := utf8.RuneCountInString(name); n < 1 || n > 100 {
+		return users.User{}, validationError("Name must be between 1 and 100 characters")
+	}
+	email = normalizeEmail(email)
+	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email || len(email) > 254 {
+		return users.User{}, validationError("Email address is not valid")
+	}
+
+	placeholder, err := newToken()
+	if err != nil {
+		return users.User{}, err
+	}
+	passwordHash, err := HashPassword(placeholder)
+	if err != nil {
+		return users.User{}, err
+	}
+	token, err := newToken()
+	if err != nil {
+		return users.User{}, err
+	}
+
+	now := s.now()
+	var user users.User
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		if user, err = s.users.CreateWithRole(ctx, tx, name, email, passwordHash, role); err != nil {
+			return err
+		}
+		return s.store.replaceToken(ctx, tx, resetTokens, user.ID, s.hasher.sum(token), now.Add(s.set.InviteTTL), now)
+	})
+	if errors.Is(err, users.ErrEmailTaken) {
+		return users.User{}, ErrEmailTaken
+	}
+	if err != nil {
+		return users.User{}, err
+	}
+
+	if err := s.mailer.SendInvite(ctx, user.Name, user.Email, user.Role, token); err != nil {
+		s.log.Error("send invite email", "user_id", user.ID, "error", err)
+	}
+	return user, nil
 }
 
 func (s *Service) issueSession(ctx context.Context, db database.DBTX, userID string, remember bool, now time.Time) (IssuedSession, error) {

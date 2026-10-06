@@ -4,7 +4,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
@@ -17,12 +19,14 @@ type Handler struct {
 
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
-func (h *Handler) Mount(mux *http.ServeMux, admin middleware.Middleware) {
-	mux.HandleFunc("GET /api/v1/categories", h.listPublic)
+func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+	cached := middleware.PublicCache(time.Minute, 5*time.Minute)
 
-	mux.Handle("GET /api/v1/admin/categories", admin(http.HandlerFunc(h.listAll)))
-	mux.Handle("POST /api/v1/admin/categories", admin(http.HandlerFunc(h.create)))
-	mux.Handle("PATCH /api/v1/admin/categories/{id}", admin(http.HandlerFunc(h.update)))
+	mux.Handle("GET /api/v1/categories", cached(http.HandlerFunc(h.listPublic)))
+
+	mux.Handle("GET /api/v1/admin/categories", access.Staff(http.HandlerFunc(h.listAll)))
+	mux.Handle("POST /api/v1/admin/categories", access.Admin(http.HandlerFunc(h.create)))
+	mux.Handle("PATCH /api/v1/admin/categories/{id}", access.Admin(http.HandlerFunc(h.update)))
 }
 
 func (h *Handler) listPublic(w http.ResponseWriter, r *http.Request) {

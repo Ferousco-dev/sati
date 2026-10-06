@@ -7,7 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
@@ -20,18 +22,20 @@ type Handler struct {
 
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
-func (h *Handler) Mount(mux *http.ServeMux, admin middleware.Middleware) {
-	mux.HandleFunc("GET /api/v1/products", h.listPublic)
-	mux.HandleFunc("GET /api/v1/products/{id}", h.getPublic)
-	mux.HandleFunc("GET /api/v1/categories/{id}/products", h.listByCategory)
+func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+	cached := middleware.PublicCache(time.Minute, 5*time.Minute)
 
-	mux.Handle("GET /api/v1/admin/products", admin(http.HandlerFunc(h.listAdmin)))
-	mux.Handle("POST /api/v1/admin/products", admin(http.HandlerFunc(h.create)))
-	mux.Handle("PATCH /api/v1/admin/products/{id}", admin(http.HandlerFunc(h.update)))
-	mux.Handle("POST /api/v1/admin/products/{id}/archive", admin(http.HandlerFunc(h.archive)))
-	mux.Handle("POST /api/v1/admin/products/{id}/availability", admin(http.HandlerFunc(h.setAvailability)))
-	mux.Handle("POST /api/v1/admin/products/{id}/images", admin(http.HandlerFunc(h.addImage)))
-	mux.Handle("DELETE /api/v1/admin/products/{id}/images/{imageId}", admin(http.HandlerFunc(h.deleteImage)))
+	mux.Handle("GET /api/v1/products", cached(http.HandlerFunc(h.listPublic)))
+	mux.Handle("GET /api/v1/products/{id}", cached(http.HandlerFunc(h.getPublic)))
+	mux.Handle("GET /api/v1/categories/{id}/products", cached(http.HandlerFunc(h.listByCategory)))
+
+	mux.Handle("GET /api/v1/admin/products", access.Staff(http.HandlerFunc(h.listAdmin)))
+	mux.Handle("POST /api/v1/admin/products", access.Admin(http.HandlerFunc(h.create)))
+	mux.Handle("PATCH /api/v1/admin/products/{id}", access.Admin(http.HandlerFunc(h.update)))
+	mux.Handle("POST /api/v1/admin/products/{id}/archive", access.Admin(http.HandlerFunc(h.archive)))
+	mux.Handle("POST /api/v1/admin/products/{id}/availability", access.Staff(http.HandlerFunc(h.setAvailability)))
+	mux.Handle("POST /api/v1/admin/products/{id}/images", access.Admin(http.HandlerFunc(h.addImage)))
+	mux.Handle("DELETE /api/v1/admin/products/{id}/images/{imageId}", access.Admin(http.HandlerFunc(h.deleteImage)))
 }
 
 func (h *Handler) listPublic(w http.ResponseWriter, r *http.Request) {

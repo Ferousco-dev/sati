@@ -110,6 +110,8 @@ func Recover(log *slog.Logger) Middleware {
 func CORS(allowed []string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Vary", "Origin")
+
 			origin := r.Header.Get("Origin")
 			if origin == "" || !slices.Contains(allowed, origin) {
 				next.ServeHTTP(w, r)
@@ -119,7 +121,6 @@ func CORS(allowed []string) Middleware {
 			h := w.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Access-Control-Allow-Credentials", "true")
-			h.Add("Vary", "Origin")
 
 			if r.Method == http.MethodOptions {
 				h.Set("Access-Control-Allow-Methods", strings.Join([]string{

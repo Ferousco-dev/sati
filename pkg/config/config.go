@@ -33,6 +33,7 @@ type Config struct {
 
 	StorageDriver string
 	UploadDir     string
+	AssetBaseURL  string
 
 	TrustedProxies     []netip.Prefix
 	CORSAllowedOrigins []string
@@ -73,6 +74,7 @@ func Load() (Config, error) {
 
 		StorageDriver: getenv("STORAGE_DRIVER", "local"),
 		UploadDir:     getenv("UPLOAD_DIR", "uploads"),
+		AssetBaseURL:  os.Getenv("ASSET_BASE_URL"),
 
 		TrustedProxies:     proxies,
 		CORSAllowedOrigins: splitList(os.Getenv("CORS_ALLOWED_ORIGINS")),

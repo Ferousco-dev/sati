@@ -43,6 +43,25 @@ func (h *Handler) RequireAuth() middleware.Middleware {
 	}
 }
 
+type Access struct {
+	Staff middleware.Middleware
+	Admin middleware.Middleware
+	Rider middleware.Middleware
+}
+
+func (h *Handler) Access() Access {
+	authn := h.RequireAuth()
+	with := func(roles ...users.Role) middleware.Middleware {
+		role := RequireRole(roles...)
+		return func(next http.Handler) http.Handler { return authn(role(next)) }
+	}
+	return Access{
+		Staff: with(users.RoleAdmin, users.RoleStaff),
+		Admin: with(users.RoleAdmin),
+		Rider: with(users.RoleRider),
+	}
+}
+
 func RequireRole(roles ...users.Role) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

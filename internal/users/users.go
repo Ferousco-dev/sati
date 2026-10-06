@@ -20,6 +20,14 @@ const (
 	RoleRider    Role = "RIDER"
 )
 
+func (r Role) Valid() bool {
+	switch r {
+	case RoleCustomer, RoleStaff, RoleAdmin, RoleRider:
+		return true
+	}
+	return false
+}
+
 type User struct {
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
@@ -51,9 +59,13 @@ func scan(row pgx.Row) (User, error) {
 }
 
 func (r *Repository) Create(ctx context.Context, db database.DBTX, name, email, passwordHash string) (User, error) {
+	return r.CreateWithRole(ctx, db, name, email, passwordHash, RoleCustomer)
+}
+
+func (r *Repository) CreateWithRole(ctx context.Context, db database.DBTX, name, email, passwordHash string, role Role) (User, error) {
 	u, err := scan(db.QueryRow(ctx,
-		`INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING `+columns,
-		name, email, passwordHash))
+		`INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4::user_role) RETURNING `+columns,
+		name, email, passwordHash, string(role)))
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -64,6 +76,36 @@ func (r *Repository) Create(ctx context.Context, db database.DBTX, name, email, 
 
 func (r *Repository) ByEmail(ctx context.Context, db database.DBTX, email string) (User, error) {
 	return scan(db.QueryRow(ctx, `SELECT `+columns+` FROM users WHERE email = $1`, email))
+}
+
+func (r *Repository) ByID(ctx context.Context, db database.DBTX, id string) (User, error) {
+	return scan(db.QueryRow(ctx, `SELECT `+columns+` FROM users WHERE id = $1`, id))
+}
+
+func (r *Repository) List(ctx context.Context, db database.DBTX, role Role, limit, offset int) ([]User, int, error) {
+	var total int
+	if err := db.QueryRow(ctx,
+		`SELECT count(*) FROM users WHERE ($1 = '' OR role::text = $1)`, string(role)).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := db.Query(ctx,
+		`SELECT `+columns+` FROM users WHERE ($1 = '' OR role::text = $1)
+		 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3`, string(role), limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	out := []User{}
+	for rows.Next() {
+		u, err := scan(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, u)
+	}
+	return out, total, rows.Err()
 }
 
 func (r *Repository) MarkEmailVerified(ctx context.Context, db database.DBTX, id string, at time.Time) error {

@@ -3,6 +3,8 @@ package email
 import (
 	"context"
 	"log/slog"
+
+	"github.com/Ferousco-dev/sati/backend/internal/users"
 )
 
 // LogMailer prints emails to the log instead of sending them.
@@ -23,6 +25,11 @@ func (m *LogMailer) SendVerification(_ context.Context, name, email, token strin
 
 func (m *LogMailer) SendPasswordReset(_ context.Context, name, email, token string) error {
 	m.send("password reset", name, email, token)
+	return nil
+}
+
+func (m *LogMailer) SendInvite(_ context.Context, name, email string, role users.Role, token string) error {
+	m.send("invite "+string(role), name, email, token)
 	return nil
 }
 

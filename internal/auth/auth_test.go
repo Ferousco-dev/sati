@@ -17,6 +17,7 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"github.com/Ferousco-dev/sati/backend/db"
+	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
 )
 
@@ -31,6 +32,11 @@ func (m *captureMailer) SendVerification(_ context.Context, _, email, token stri
 
 func (m *captureMailer) SendPasswordReset(_ context.Context, _, email, token string) error {
 	m.sent = append(m.sent, sentMail{"reset", email, token})
+	return nil
+}
+
+func (m *captureMailer) SendInvite(_ context.Context, _, email string, _ users.Role, token string) error {
+	m.sent = append(m.sent, sentMail{"invite", email, token})
 	return nil
 }
 

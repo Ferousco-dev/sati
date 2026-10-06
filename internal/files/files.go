@@ -18,13 +18,21 @@ type Storage interface {
 
 const LocalURLPrefix = "/api/v1/files/"
 
-type LocalStorage struct{ dir string }
+type LocalStorage struct {
+	dir     string
+	baseURL string
+}
 
-func NewLocalStorage(dir string) (*LocalStorage, error) {
+// NewLocalStorage serves files under baseURL, which can point at a CDN
+// domain. An empty baseURL uses the API's own file route.
+func NewLocalStorage(dir, baseURL string) (*LocalStorage, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	return &LocalStorage{dir: dir}, nil
+	if baseURL == "" {
+		baseURL = LocalURLPrefix
+	}
+	return &LocalStorage{dir: dir, baseURL: strings.TrimRight(baseURL, "/") + "/"}, nil
 }
 
 func (s *LocalStorage) path(key string) (string, error) {
@@ -66,13 +74,36 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 	return nil
 }
 
-func (s *LocalStorage) URL(key string) string { return LocalURLPrefix + key }
+func (s *LocalStorage) URL(key string) string { return s.baseURL + key }
 
+type cacheOnSuccess struct {
+	http.ResponseWriter
+	wrote bool
+}
+
+func (c *cacheOnSuccess) WriteHeader(code int) {
+	if !c.wrote {
+		c.wrote = true
+		if code == http.StatusOK || code == http.StatusNotModified || code == http.StatusPartialContent {
+			c.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+	}
+	c.ResponseWriter.WriteHeader(code)
+}
+
+func (c *cacheOnSuccess) Write(p []byte) (int, error) {
+	if !c.wrote {
+		c.WriteHeader(http.StatusOK)
+	}
+	return c.ResponseWriter.Write(p)
+}
+
+// Stored keys are random and never reused, so a file's URL never changes
+// content and can be cached forever. Errors are not cached.
 func (s *LocalStorage) Handler() http.Handler {
 	files := http.StripPrefix(LocalURLPrefix, http.FileServer(http.Dir(s.dir)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		files.ServeHTTP(w, r)
+		files.ServeHTTP(&cacheOnSuccess{ResponseWriter: w}, r)
 	})
 }

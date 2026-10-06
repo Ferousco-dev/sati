@@ -19,6 +19,7 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"github.com/Ferousco-dev/sati/backend/db"
+	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
@@ -29,14 +30,20 @@ import (
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
 )
 
-type noopMailer struct{}
+type captureMailer struct{ invites map[string]string }
 
-func (noopMailer) SendVerification(context.Context, string, string, string) error  { return nil }
-func (noopMailer) SendPasswordReset(context.Context, string, string, string) error { return nil }
+func (*captureMailer) SendVerification(context.Context, string, string, string) error  { return nil }
+func (*captureMailer) SendPasswordReset(context.Context, string, string, string) error { return nil }
+
+func (m *captureMailer) SendInvite(_ context.Context, _, email string, _ users.Role, token string) error {
+	m.invites[email] = token
+	return nil
+}
 
 type catalogEnv struct {
-	srv  http.Handler
-	exec func(query string, args ...any)
+	srv    http.Handler
+	mailer *captureMailer
+	exec   func(query string, args ...any)
 }
 
 func newCatalogEnv(t *testing.T) *catalogEnv {
@@ -68,23 +75,26 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	}
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	storage, err := files.NewLocalStorage(t.TempDir())
+	storage, err := files.NewLocalStorage(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	authSvc := auth.NewService(pool, noopMailer{}, log, "test-secret", auth.DefaultSettings())
+	mailer := &captureMailer{invites: map[string]string{}}
+	authSvc := auth.NewService(pool, mailer, log, "test-secret", auth.DefaultSettings())
 	handlers := Handlers{
 		Health:     health.New(pool),
 		Auth:       auth.NewHandler(authSvc, log, false),
 		Categories: categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),
 		Products:   products.NewHandler(products.NewService(pool, storage, log), log),
+		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
 		LocalFiles: storage.Handler(),
 	}
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 
 	return &catalogEnv{
-		srv: New(cfg, log, handlers),
+		srv:    New(cfg, log, handlers),
+		mailer: mailer,
 		exec: func(query string, args ...any) {
 			if _, err := pool.Exec(context.Background(), query, args...); err != nil {
 				t.Fatal(err)
@@ -307,6 +317,9 @@ func TestProductImages(t *testing.T) {
 	img := decode[struct{ Image products.Image }](t, rec).Image
 
 	served := e.do(t, "GET", img.URL, nil, nil)
+	if served.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Fatalf("image cache header: %q", served.Header().Get("Cache-Control"))
+	}
 	if served.Code != http.StatusOK || !bytes.Equal(served.Body.Bytes(), pngData.Bytes()) {
 		t.Fatalf("serve image: %d", served.Code)
 	}
@@ -319,10 +332,155 @@ func TestProductImages(t *testing.T) {
 	if rec := e.do(t, "DELETE", path+"/"+img.ID, nil, admin); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete image: %d", rec.Code)
 	}
-	if rec := e.do(t, "GET", img.URL, nil, nil); rec.Code != http.StatusNotFound {
-		t.Fatalf("deleted image still served: %d", rec.Code)
+	if rec := e.do(t, "GET", img.URL, nil, nil); rec.Code != http.StatusNotFound || rec.Header().Get("Cache-Control") == "public, max-age=31536000, immutable" {
+		t.Fatalf("deleted image still served or its 404 cached: %d", rec.Code)
 	}
 	if rec := e.do(t, "DELETE", path+"/"+img.ID, nil, admin); rec.Code != http.StatusNotFound {
 		t.Fatalf("second delete: %d", rec.Code)
+	}
+}
+
+func TestStaffAndRiderAccess(t *testing.T) {
+	e := newCatalogEnv(t)
+	admin := e.signIn(t, "a@example.com", users.RoleAdmin)
+	staff := e.signIn(t, "s@example.com", users.RoleStaff)
+	rider := e.signIn(t, "r@example.com", users.RoleRider)
+
+	cat := e.createCategory(t, admin, "Yoghurt")
+	product := e.createProduct(t, admin, cat, "Plain", 100)
+
+	if rec := e.do(t, "GET", "/api/v1/admin/products", nil, staff); rec.Code != http.StatusOK {
+		t.Fatalf("staff list: %d", rec.Code)
+	}
+	if rec := e.do(t, "GET", "/api/v1/admin/categories", nil, staff); rec.Code != http.StatusOK {
+		t.Fatalf("staff categories: %d", rec.Code)
+	}
+	if rec := e.do(t, "POST", "/api/v1/admin/products/"+product+"/availability", map[string]any{"available": false}, staff); rec.Code != http.StatusOK {
+		t.Fatalf("staff availability: %d", rec.Code)
+	}
+
+	forbiddenForStaff := []struct{ method, path string }{
+		{"POST", "/api/v1/admin/products"},
+		{"PATCH", "/api/v1/admin/products/" + product},
+		{"POST", "/api/v1/admin/products/" + product + "/archive"},
+		{"POST", "/api/v1/admin/categories"},
+		{"GET", "/api/v1/admin/users"},
+		{"POST", "/api/v1/admin/users"},
+	}
+	for _, c := range forbiddenForStaff {
+		if rec := e.do(t, c.method, c.path, map[string]any{}, staff); rec.Code != http.StatusForbidden {
+			t.Fatalf("staff %s %s: got %d", c.method, c.path, rec.Code)
+		}
+	}
+
+	for _, path := range []string{"/api/v1/admin/products", "/api/v1/admin/categories", "/api/v1/admin/users"} {
+		if rec := e.do(t, "GET", path, nil, rider); rec.Code != http.StatusForbidden {
+			t.Fatalf("rider %s: got %d", path, rec.Code)
+		}
+	}
+}
+
+func TestInviteAndRoleManagement(t *testing.T) {
+	e := newCatalogEnv(t)
+	admin := e.signIn(t, "a@example.com", users.RoleAdmin)
+
+	rec := e.do(t, "POST", "/api/v1/admin/users", map[string]any{"name": "Sam", "email": "Sam@Example.com", "role": "STAFF"}, admin)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("invite: %d %s", rec.Code, rec.Body)
+	}
+	invited := decode[struct{ User users.User }](t, rec).User
+	if invited.Role != users.RoleStaff {
+		t.Fatalf("role: %s", invited.Role)
+	}
+
+	token := e.mailer.invites["sam@example.com"]
+	if token == "" {
+		t.Fatal("no invite email")
+	}
+	if rec := e.do(t, "POST", "/api/v1/admin/users", map[string]any{"name": "Sam", "email": "sam@example.com", "role": "STAFF"}, admin); rec.Code != http.StatusConflict {
+		t.Fatalf("duplicate invite: %d", rec.Code)
+	}
+	if rec := e.do(t, "POST", "/api/v1/admin/users", map[string]any{"name": "Cust", "email": "c@example.com", "role": "CUSTOMER"}, admin); rec.Code != http.StatusBadRequest {
+		t.Fatalf("invite as customer: %d", rec.Code)
+	}
+
+	if rec := e.do(t, "POST", "/api/v1/auth/reset-password", map[string]any{"token": token, "password": "staff-password-1"}, nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("set password: %d %s", rec.Code, rec.Body)
+	}
+	login := e.do(t, "POST", "/api/v1/auth/login", map[string]any{"email": "sam@example.com", "password": "staff-password-1"}, nil)
+	if login.Code != http.StatusOK {
+		t.Fatalf("invited login: %d", login.Code)
+	}
+	var staffCookie *http.Cookie
+	for _, c := range login.Result().Cookies() {
+		staffCookie = c
+	}
+	if rec := e.do(t, "GET", "/api/v1/admin/products", nil, staffCookie); rec.Code != http.StatusOK {
+		t.Fatalf("new staff access: %d", rec.Code)
+	}
+
+	promote := e.do(t, "PATCH", "/api/v1/admin/users/"+invited.ID+"/role", map[string]any{"role": "RIDER"}, admin)
+	if promote.Code != http.StatusOK || decode[struct{ User users.User }](t, promote).User.Role != users.RoleRider {
+		t.Fatalf("change role: %d %s", promote.Code, promote.Body)
+	}
+	if rec := e.do(t, "GET", "/api/v1/admin/products", nil, staffCookie); rec.Code != http.StatusForbidden {
+		t.Fatalf("role change must apply immediately: %d", rec.Code)
+	}
+
+	self := decode[struct{ User users.User }](t, e.do(t, "GET", "/api/v1/auth/me", nil, admin)).User
+	if rec := e.do(t, "PATCH", "/api/v1/admin/users/"+self.ID+"/role", map[string]any{"role": "CUSTOMER"}, admin); rec.Code != http.StatusBadRequest {
+		t.Fatalf("self role change: %d", rec.Code)
+	}
+	if rec := e.do(t, "PATCH", "/api/v1/admin/users/"+invited.ID+"/role", map[string]any{"role": "BOSS"}, admin); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad role: %d", rec.Code)
+	}
+
+	list := decode[struct {
+		Users []users.User
+		Total int
+	}](t, e.do(t, "GET", "/api/v1/admin/users?role=RIDER", nil, admin))
+	if list.Total != 1 || list.Users[0].Email != "sam@example.com" {
+		t.Fatalf("rider filter: %+v", list)
+	}
+}
+
+func TestCaching(t *testing.T) {
+	e := newCatalogEnv(t)
+	admin := e.signIn(t, "a@example.com", users.RoleAdmin)
+	e.createProduct(t, admin, e.createCategory(t, admin, "Yoghurt"), "Plain", 100)
+
+	first := e.do(t, "GET", "/api/v1/products", nil, nil)
+	etag := first.Header().Get("ETag")
+	if etag == "" || first.Header().Get("Cache-Control") != "public, max-age=60, stale-while-revalidate=300" {
+		t.Fatalf("headers: %v", first.Header())
+	}
+	if first.Header().Get("Vary") != "Origin" {
+		t.Fatalf("shared caches need Vary: Origin, got %q", first.Header().Get("Vary"))
+	}
+
+	req := httptest.NewRequest("GET", "/api/v1/products", nil)
+	req.Header.Set("If-None-Match", etag)
+	rec := httptest.NewRecorder()
+	e.srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotModified || rec.Body.Len() != 0 {
+		t.Fatalf("conditional request: %d", rec.Code)
+	}
+
+	e.createProduct(t, admin, e.createCategory(t, admin, "Parfait"), "Fruit", 200)
+	req = httptest.NewRequest("GET", "/api/v1/products", nil)
+	req.Header.Set("If-None-Match", etag)
+	rec = httptest.NewRecorder()
+	e.srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("changed data must not return 304: %d", rec.Code)
+	}
+
+	for _, path := range []string{"/api/v1/auth/me", "/api/v1/admin/products", "/api/v1/health"} {
+		if got := e.do(t, "GET", path, nil, admin).Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("%s must not be cached, got %q", path, got)
+		}
+	}
+	if got := e.do(t, "GET", "/api/v1/products/not-a-uuid", nil, nil).Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("errors must not be cached, got %q", got)
 	}
 }

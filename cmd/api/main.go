@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/email"
@@ -48,7 +49,7 @@ func run() error {
 	mailer := email.NewLogMailer(log, !cfg.IsProduction())
 	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
 
-	storage, err := files.NewLocalStorage(cfg.UploadDir)
+	storage, err := files.NewLocalStorage(cfg.UploadDir, cfg.AssetBaseURL)
 	if cfg.StorageDriver != "local" {
 		err = fmt.Errorf("storage driver %q is not implemented yet", cfg.StorageDriver)
 	}
@@ -63,6 +64,7 @@ func run() error {
 		Auth:       auth.NewHandler(authSvc, log, cfg.IsProduction()),
 		Categories: categories.NewHandler(categorySvc, log),
 		Products:   products.NewHandler(productSvc, log),
+		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
 		LocalFiles: storage.Handler(),
 	}
 

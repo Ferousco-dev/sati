@@ -193,13 +193,22 @@ A new verification email can be requested after 60 seconds.
 SATI has four primary roles:
 
 
-| Role          | Access                                           |
-| ------------- | ------------------------------------------------ |
-| `CUSTOMER`    | Own account, cart, addresses and orders.         |
-| `STAFF(soon)` | Store operations and order management.           |
-| `ADMIN`       | Full store and platform management.              |
-| `RIDER(soon)` | Assigned deliveries and delivery status updates. |
+| Role       | Access                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| `CUSTOMER` | Own account, cart, addresses and orders.                                                        |
+| `STAFF`    | Store operations: view products and categories, change availability, manage orders.            |
+| `ADMIN`    | Everything STAFF can do, plus catalog editing, users, roles and store settings.                |
+| `RIDER`    | Only their own assigned deliveries and delivery status updates.                                 |
 
+All four roles work from day one. Roles are assigned through the admin API, never by editing code:
+
+| Route                                   | What it does                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /api/v1/admin/users`               | Lists users, optionally filtered with `?role=`.                              |
+| `POST /api/v1/admin/users`              | Creates a STAFF, RIDER or ADMIN account and emails a link to set a password. |
+| `PATCH /api/v1/admin/users/:id/role`    | Changes a user's role. Takes effect immediately. You cannot change your own. |
+
+Invite links last 72 hours and use the same single-use token as password reset.
 
 Authorization is checked on the backend for every protected resource. A frontend role check is never treated as sufficient authorization.
 
@@ -254,6 +263,19 @@ go run ./cmd/seed
 ```
 
 `cmd/seed` adds sample categories and products in development only. If `ADMIN_PASSWORD` is not set, the admin command reads the password from stdin.
+
+## Speed, caching and CDN
+
+Speed is a core goal of the project.
+
+- Public catalog responses carry `ETag` and `Cache-Control: public, max-age=60, stale-while-revalidate=300`. Browsers, phones and CDNs reuse them, and a repeat request answers `304 Not Modified` with no body.
+- Every other API response is `Cache-Control: no-store`, so personal data is never kept by a shared cache. Responses always send `Vary: Origin`.
+- Image files are never overwritten, so they are served with `Cache-Control: public, max-age=31536000, immutable`. Errors are never cached.
+- Compression (`zstd`, `gzip`) is handled by the proxy. `deploy/Caddyfile` enables it locally and Cloudflare does it in production.
+
+To put images behind a CDN, set `ASSET_BASE_URL` to the CDN address. Cloudflare in front of the API origin will then cache `/api/v1/files/*` at the edge. When object storage is added, point the CDN at the bucket's custom domain in the same way. Resizing and WebP conversion happen at the edge or in the frontend image component, so the API only stores originals.
+
+Storing data on a customer's phone beyond the session cookie needs consent. The frontend shows an accept button, stores the choice locally, and only caches data on the device after it is accepted.
 
 ## Cart and checkout
 

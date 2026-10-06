@@ -4,12 +4,12 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
-	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
@@ -20,6 +20,7 @@ type Handlers struct {
 	Auth       *auth.Handler
 	Categories *categories.Handler
 	Products   *products.Handler
+	Admin      *admin.Handler
 	LocalFiles http.Handler
 }
 
@@ -29,11 +30,10 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
 	mux.HandleFunc("GET /api/v1/health", h.Health.Check)
 	h.Auth.Mount(mux)
 
-	admin := func(next http.Handler) http.Handler {
-		return h.Auth.RequireAuth()(auth.RequireRole(users.RoleAdmin)(next))
-	}
-	h.Categories.Mount(mux, admin)
-	h.Products.Mount(mux, admin)
+	access := h.Auth.Access()
+	h.Categories.Mount(mux, access)
+	h.Products.Mount(mux, access)
+	h.Admin.Mount(mux, access)
 	if h.LocalFiles != nil {
 		mux.Handle("GET "+files.LocalURLPrefix, h.LocalFiles)
 	}
@@ -45,6 +45,7 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
 	return middleware.Chain(mux,
 		middleware.WithRequestID(),
 		middleware.WithClientIP(cfg.TrustedProxies),
+		middleware.NoStore(),
 		middleware.Logger(log),
 		middleware.Recover(log),
 		middleware.CORS(cfg.CORSAllowedOrigins),

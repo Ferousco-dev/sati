@@ -1,4 +1,6 @@
 :8000 {
+	encode zstd gzip
+
 	handle /api/* {
 		reverse_proxy host.docker.internal:8080
 	}
