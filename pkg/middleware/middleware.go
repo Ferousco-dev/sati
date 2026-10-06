@@ -135,6 +135,27 @@ func CORS(allowed []string) Middleware {
 	}
 }
 
+// OriginCheck blocks cross-site state-changing requests from browsers.
+// Requests without an Origin header carry no ambient cookies and pass.
+func OriginCheck(allowed []string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet, http.MethodHead, http.MethodOptions:
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			origin := r.Header.Get("Origin")
+			if origin != "" && !slices.Contains(allowed, origin) {
+				apierror.Write(w, apierror.New(http.StatusForbidden, "CSRF_REJECTED", "Request origin is not allowed"))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func newID() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)

@@ -761,7 +761,14 @@ Tests cover:
 - Rider assignment
 - Delivery status transitions
 
-Integration tests use a dedicated PostgreSQL test database.
+Integration tests use a dedicated PostgreSQL test database. They are skipped unless `TEST_DATABASE_URL` is set:
+
+```bash
+createdb -O sati sati_test
+TEST_DATABASE_URL="postgres://sati:sati@localhost:5432/sati_test?sslmode=disable" go test ./...
+```
+
+The tests truncate the users table, so never point `TEST_DATABASE_URL` at the development database.
 
 Payment provider calls should use test credentials or mocked provider implementations during automated tests.
 

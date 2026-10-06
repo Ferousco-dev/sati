@@ -1,0 +1,183 @@
+package auth
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
+	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
+	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
+)
+
+const CookieName = "sati_session"
+
+type Handler struct {
+	svc          *Service
+	log          *slog.Logger
+	secureCookie bool
+}
+
+func NewHandler(svc *Service, log *slog.Logger, secureCookie bool) *Handler {
+	return &Handler{svc: svc, log: log, secureCookie: secureCookie}
+}
+
+func (h *Handler) Mount(mux *http.ServeMux) {
+	authn := h.RequireAuth()
+
+	mux.HandleFunc("POST /api/v1/auth/register", h.register)
+	mux.HandleFunc("POST /api/v1/auth/login", h.login)
+	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
+	mux.Handle("GET /api/v1/auth/me", authn(http.HandlerFunc(h.me)))
+	mux.HandleFunc("POST /api/v1/auth/verify-email", h.verifyEmail)
+	mux.Handle("POST /api/v1/auth/resend-verification", authn(http.HandlerFunc(h.resendVerification)))
+	mux.HandleFunc("POST /api/v1/auth/forgot-password", h.forgotPassword)
+	mux.HandleFunc("POST /api/v1/auth/reset-password", h.resetPassword)
+}
+
+func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name       string `json:"name"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"remember_me"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+
+	user, issued, err := h.svc.Register(r.Context(), RegisterInput(body))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.setCookie(w, issued.Token, issued.ExpiresAt)
+	apierror.JSON(w, http.StatusCreated, map[string]any{"user": user})
+}
+
+func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"remember_me"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+
+	user, issued, err := h.svc.Login(r.Context(), LoginInput(body))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.setCookie(w, issued.Token, issued.ExpiresAt)
+	apierror.JSON(w, http.StatusOK, map[string]any{"user": user})
+}
+
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(CookieName); err == nil {
+		if err := h.svc.Logout(r.Context(), c.Value); err != nil {
+			h.fail(w, r, err)
+			return
+		}
+	}
+	h.clearCookie(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	apierror.JSON(w, http.StatusOK, map[string]any{"user": id.User})
+}
+
+func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	if err := h.svc.VerifyEmail(r.Context(), body.Token); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) resendVerification(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	if err := h.svc.ResendVerification(r.Context(), id.User); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	if err := h.svc.ForgotPassword(r.Context(), body.Email); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	if err := h.svc.ResetPassword(r.Context(), body.Token, body.Password); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
+	var apiErr *apierror.Error
+	if errors.As(err, &apiErr) {
+		apierror.Write(w, apiErr)
+		return
+	}
+	h.log.Error("request failed", "request_id", middleware.RequestID(r.Context()), "error", err)
+	apierror.Write(w, apierror.ErrInternal)
+}
+
+func (h *Handler) setCookie(w http.ResponseWriter, token string, expires time.Time) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    token,
+		Path:     "/",
+		Expires:  expires,
+		HttpOnly: true,
+		Secure:   h.secureCookie,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (h *Handler) clearCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.secureCookie,
+		SameSite: http.SameSiteLaxMode,
+	})
+}

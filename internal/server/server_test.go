@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 )
@@ -20,7 +21,11 @@ func (f fakePinger) Ping(context.Context) error { return f.err }
 func newTestServer(pingErr error) http.Handler {
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return New(cfg, log, health.New(fakePinger{err: pingErr}))
+	handlers := Handlers{
+		Health: health.New(fakePinger{err: pingErr}),
+		Auth:   auth.NewHandler(nil, log, false),
+	}
+	return New(cfg, log, handlers)
 }
 
 func TestHealth(t *testing.T) {
@@ -75,5 +80,30 @@ func TestCORS(t *testing.T) {
 	newTestServer(nil).ServeHTTP(rec, req)
 	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatal("unexpected CORS header for unknown origin")
+	}
+}
+
+func TestOriginCheck(t *testing.T) {
+	tests := []struct {
+		name   string
+		origin string
+		want   int
+	}{
+		{"allowed origin", "http://localhost:3000", http.StatusBadRequest},
+		{"foreign origin", "http://evil.example", http.StatusForbidden},
+		{"no origin", "", http.StatusBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/api/v1/auth/verify-email", nil)
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			rec := httptest.NewRecorder()
+			newTestServer(nil).ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Fatalf("got %d, want %d", rec.Code, tt.want)
+			}
+		})
 	}
 }

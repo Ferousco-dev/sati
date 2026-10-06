@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/auth"
+	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/server"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
@@ -40,9 +42,16 @@ func run() error {
 	}
 	defer pool.Close()
 
+	mailer := email.NewLogMailer(log, !cfg.IsProduction())
+	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
+	handlers := server.Handlers{
+		Health: health.New(pool),
+		Auth:   auth.NewHandler(authSvc, log, cfg.IsProduction()),
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           server.New(cfg, log, health.New(pool)),
+		Handler:           server.New(cfg, log, handlers),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
