@@ -592,11 +592,32 @@ The backend verifies the transaction with Paystack before marking the payment as
 | `GET /api/v1/payments/:reference`  | Returns payment information for an authorized order. |
 | `POST /api/v1/payments/verify`     | Verifies a payment with the payment provider.        |
 | `POST /api/v1/webhooks/paystack`   | Receives and processes Paystack webhook events.      |
+| `POST /api/v1/admin/payments/:id/refunded` | Records that a paid payment was refunded (ADMIN). |
 
 
 Webhook processing is idempotent. Receiving the same event more than once must not create another payment or duplicate an order state transition.
 
 Payment secrets are only available to the backend.
+
+### How online payment works
+
+1. The customer places an `ONLINE` order, then the frontend calls `POST /api/v1/payments/initialize` with `{ "order_id": "..." }`. The response has a `reference` and an `authorization_url`. Redirect the customer to that URL.
+2. After paying, Paystack sends the customer back to `FRONTEND_URL/orders/:id`. The page calls `POST /api/v1/payments/verify` with the `reference` to show the result straight away. Paystack also calls `POST /api/v1/webhooks/paystack` on its own, so an order is confirmed even if the customer closes the browser.
+3. The server never believes the browser or the webhook body. Both ask Paystack directly what happened to the reference, and the paid amount and currency must match the order exactly.
+4. A successful payment sets the payment `PAID`, the order `PAID` and the order `CONFIRMED` in one transaction, then queues the receipt email.
+
+Rules the code enforces:
+
+- Every attempt gets its own reference (`SATI-10042-A1B2C3D4E5`), so a customer can retry after a failed or abandoned payment. An order allows up to 10 attempts, and only one payment can ever settle it.
+- Webhooks are checked with the HMAC-SHA512 signature in `X-Paystack-Signature`. The secret is `PAYSTACK_WEBHOOK_SECRET`, or `PAYSTACK_SECRET_KEY` when that is not set. A bad signature gets `401` and changes nothing.
+- Each event is stored in `payment_events` and handled once. Paystack can repeat an event, and a webhook and a verify call can arrive together, without ever confirming an order twice. If something fails, the webhook answers `500` so Paystack tries again.
+- An unpaid online order is cancelled after `PAYMENT_EXPIRY_MINUTES` (default 30, `0` turns it off) with the reason "Payment not completed in time", and the customer is told.
+- Money that arrives when the order cannot use it (it was cancelled or expired, a second attempt also paid, or the amount was wrong) is recorded and marked `needs_refund`. Cancelling an order that was already paid marks it the same way. Staff see these with `GET /api/v1/admin/payments?needs_refund=true`, refund the customer in the Paystack dashboard, then call `POST /api/v1/admin/payments/:id/refunded` (ADMIN) to record it.
+- `ONLINE` is only offered at checkout when `PAYSTACK_SECRET_KEY` is set, so an order is never created that nobody can pay.
+- Without a secret key the payment routes and the webhook are not registered at all.
+
+To test locally, use Paystack test keys and expose the API with a tunnel, then set the webhook URL in the Paystack dashboard to `https://<your-tunnel>/api/v1/webhooks/paystack`.
+
 
 ## Database
 

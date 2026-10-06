@@ -278,6 +278,11 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID, id string, to Statu
 		if err := s.repo.setStatus(ctx, tx, id, to, reason, now); err != nil {
 			return err
 		}
+		if to == StatusCancelled || to == StatusFailed {
+			if err := s.payments.FlagRefundForOrder(ctx, tx, id, now); err != nil {
+				return err
+			}
+		}
 		if err := s.collectCash(ctx, tx, id, cur, to, actorID, now); err != nil {
 			return err
 		}

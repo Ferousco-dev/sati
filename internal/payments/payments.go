@@ -26,19 +26,21 @@ const (
 )
 
 type Payment struct {
-	ID             string     `json:"id"`
-	OrderID        string     `json:"order_id"`
-	Method         string     `json:"method"`
-	AmountKobo     int64      `json:"amount_kobo"`
-	Currency       string     `json:"currency"`
-	Status         string     `json:"status"`
-	Provider       string     `json:"provider"`
-	Reference      string     `json:"reference,omitempty"`
-	RecordedBy     string     `json:"recorded_by,omitempty"`
-	RecordedByName string     `json:"recorded_by_name,omitempty"`
-	Note           string     `json:"note,omitempty"`
-	PaidAt         *time.Time `json:"paid_at"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID              string     `json:"id"`
+	OrderID         string     `json:"order_id"`
+	Method          string     `json:"method"`
+	AmountKobo      int64      `json:"amount_kobo"`
+	Currency        string     `json:"currency"`
+	Status          string     `json:"status"`
+	Provider        string     `json:"provider"`
+	Reference       string     `json:"reference,omitempty"`
+	RecordedBy      string     `json:"recorded_by,omitempty"`
+	RecordedByName  string     `json:"recorded_by_name,omitempty"`
+	Note            string     `json:"note,omitempty"`
+	PaidAt          *time.Time `json:"paid_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	NeedsRefund     bool       `json:"needs_refund"`
+	GatewayResponse string     `json:"gateway_response,omitempty"`
 }
 
 type Row struct {
@@ -49,18 +51,19 @@ type Row struct {
 }
 
 type Filter struct {
-	Status   string
-	Method   string
-	Provider string
-	Limit    int
-	Offset   int
+	Status      string
+	Method      string
+	Provider    string
+	NeedsRefund bool
+	Limit       int
+	Offset      int
 }
 
 var ErrAlreadyPaid = apierror.New(http.StatusConflict, "ALREADY_PAID", "This order has already been paid")
 
 const columns = `p.id::text, p.order_id::text, p.method::text, p.amount_kobo, p.status::text, p.provider,
 	COALESCE(p.reference, ''), COALESCE(p.recorded_by::text, ''), COALESCE(r.name, ''), p.note,
-	p.paid_at, p.created_at`
+	p.paid_at, p.created_at, p.needs_refund, p.gateway_response`
 
 type Repository struct{}
 
@@ -69,7 +72,7 @@ func NewRepository() *Repository { return &Repository{} }
 func scanPayment(row pgx.Row, extra ...any) (Payment, error) {
 	var p Payment
 	dest := append([]any{&p.ID, &p.OrderID, &p.Method, &p.AmountKobo, &p.Status, &p.Provider,
-		&p.Reference, &p.RecordedBy, &p.RecordedByName, &p.Note, &p.PaidAt, &p.CreatedAt}, extra...)
+		&p.Reference, &p.RecordedBy, &p.RecordedByName, &p.Note, &p.PaidAt, &p.CreatedAt, &p.NeedsRefund, &p.GatewayResponse}, extra...)
 	err := row.Scan(dest...)
 	p.Currency = Currency
 	return p, err
@@ -118,10 +121,10 @@ func (Repository) ForOrders(ctx context.Context, db database.DBTX, orderIDs []st
 }
 
 func (Repository) List(ctx context.Context, db database.DBTX, f Filter) ([]Row, int, error) {
-	where := `($1 = '' OR p.status::text = $1) AND ($2 = '' OR p.method::text = $2) AND ($3 = '' OR p.provider = $3)`
+	where := `($1 = '' OR p.status::text = $1) AND ($2 = '' OR p.method::text = $2) AND ($3 = '' OR p.provider = $3) AND (NOT $4 OR p.needs_refund)`
 
 	var total int
-	if err := db.QueryRow(ctx, `SELECT count(*) FROM payments p WHERE `+where, f.Status, f.Method, f.Provider).Scan(&total); err != nil {
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM payments p WHERE `+where, f.Status, f.Method, f.Provider, f.NeedsRefund).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
@@ -131,8 +134,8 @@ func (Repository) List(ctx context.Context, db database.DBTX, f Filter) ([]Row, 
 		 JOIN orders o ON o.id = p.order_id
 		 JOIN users u ON u.id = o.customer_id
 		 LEFT JOIN users r ON r.id = p.recorded_by
-		 WHERE `+where+` ORDER BY p.created_at DESC, p.id LIMIT $4 OFFSET $5`,
-		f.Status, f.Method, f.Provider, f.Limit, f.Offset)
+		 WHERE `+where+` ORDER BY p.created_at DESC, p.id LIMIT $5 OFFSET $6`,
+		f.Status, f.Method, f.Provider, f.NeedsRefund, f.Limit, f.Offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -157,14 +160,31 @@ type Handler struct {
 	pool *pgxpool.Pool
 	repo *Repository
 	log  *slog.Logger
+	svc  Service
+	now  func() time.Time
 }
 
 func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
-	return &Handler{pool: pool, repo: NewRepository(), log: log}
+	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now}
+}
+
+// WithService turns on the customer payment routes and the webhook.
+func (h *Handler) WithService(svc Service) *Handler {
+	h.svc = svc
+	return h
 }
 
 func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/payments", access.Staff(http.HandlerFunc(h.list)))
+	mux.Handle("POST /api/v1/admin/payments/{id}/refunded", access.Admin(http.HandlerFunc(h.refunded)))
+
+	if h.svc == nil {
+		return
+	}
+	mux.Handle("POST /api/v1/payments/initialize", access.Customer(http.HandlerFunc(h.initialize)))
+	mux.Handle("POST /api/v1/payments/verify", access.Customer(http.HandlerFunc(h.verify)))
+	mux.Handle("GET /api/v1/payments/{reference}", access.Customer(http.HandlerFunc(h.status)))
+	mux.HandleFunc("POST /api/v1/webhooks/paystack", h.webhook)
 }
 
 type page struct {
@@ -182,11 +202,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	f := Filter{
-		Status:   strings.ToUpper(q.Get("status")),
-		Method:   strings.ToUpper(q.Get("method")),
-		Provider: strings.ToUpper(q.Get("provider")),
-		Limit:    limit,
-		Offset:   offset,
+		Status:      strings.ToUpper(q.Get("status")),
+		Method:      strings.ToUpper(q.Get("method")),
+		Provider:    strings.ToUpper(q.Get("provider")),
+		NeedsRefund: q.Get("needs_refund") == "true",
+		Limit:       limit,
+		Offset:      offset,
 	}
 	if f.Status != "" && !oneOf(f.Status, "PENDING", "PAID", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED", "UNPAID") {
 		apierror.Write(w, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", "Unknown status filter"))

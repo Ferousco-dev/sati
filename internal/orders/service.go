@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -32,19 +33,22 @@ const (
 )
 
 type Service struct {
-	pool      *pgxpool.Pool
-	repo      *Repository
-	addresses *addresses.Repository
-	store     *store.Repository
-	payments  *payments.Repository
-	zones     *delivery.ZoneRepository
-	delivery  *delivery.Repository
-	users     *users.Repository
-	notify    *notifications.Service
-	now       func() time.Time
+	pool        *pgxpool.Pool
+	repo        *Repository
+	addresses   *addresses.Repository
+	store       *store.Repository
+	payments    *payments.Repository
+	zones       *delivery.ZoneRepository
+	delivery    *delivery.Repository
+	users       *users.Repository
+	notify      *notifications.Service
+	provider    payments.Provider
+	frontendURL string
+	logger      *slog.Logger
+	now         func() time.Time
 }
 
-func NewService(pool *pgxpool.Pool, notify *notifications.Service) *Service {
+func NewService(pool *pgxpool.Pool, notify *notifications.Service, logger *slog.Logger) *Service {
 	return &Service{
 		pool:      pool,
 		repo:      NewRepository(),
@@ -55,6 +59,7 @@ func NewService(pool *pgxpool.Pool, notify *notifications.Service) *Service {
 		delivery:  delivery.NewRepository(),
 		users:     users.NewRepository(),
 		notify:    notify,
+		logger:    logger,
 		now:       time.Now,
 	}
 }
@@ -125,7 +130,7 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 	if err != nil {
 		return "", err
 	}
-	if !methodEnabled(settings, in.PaymentMethod) {
+	if !s.methodOpen(settings, in.PaymentMethod) {
 		return "", ErrMethodDisabled
 	}
 	if in.PaymentMethod == BankTransfer && !settings.BankTransferReady() {
@@ -200,6 +205,19 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 
 // deliveryFee uses the fee of the zone chosen on the address. A store that
 // has not set up any zones yet falls back to the flat fee in its settings.
+func (s *Service) log(msg string, args ...any) {
+	if s.logger != nil {
+		s.logger.Error(msg, args...)
+	}
+}
+
+func (s *Service) methodOpen(settings store.Settings, m PaymentMethod) bool {
+	if m == PayOnline && !s.onlineOpen() {
+		return false
+	}
+	return methodEnabled(settings, m)
+}
+
 func (s *Service) deliveryFee(ctx context.Context, tx pgx.Tx, address addresses.Address, settings store.Settings) (int64, error) {
 	if address.ZoneID != "" {
 		zone, err := s.zones.GetShared(ctx, tx, address.ZoneID)
@@ -370,7 +388,7 @@ func (s *Service) CheckoutOptions(ctx context.Context) (CheckoutOptions, error) 
 	}
 	for _, f := range []Fulfillment{Pickup, Delivery} {
 		for _, m := range MethodsFor(f) {
-			if !methodEnabled(settings, m) || (m == BankTransfer && !settings.BankTransferReady()) {
+			if !s.methodOpen(settings, m) || (m == BankTransfer && !settings.BankTransferReady()) {
 				continue
 			}
 			out.PaymentMethods[f] = append(out.PaymentMethods[f], m)

@@ -70,8 +70,21 @@ func run() error {
 		return err
 	}
 
+	orderSvc := orders.NewService(pool, notifier, log)
+	var paymentSvc payments.Service
+	if cfg.PaystackSecretKey != "" {
+		orderSvc.EnableOnline(payments.NewPaystack(cfg.PaystackSecretKey, cfg.PaystackWebhookSecret), cfg.FrontendURL)
+		paymentSvc = orderSvc
+	} else {
+		log.Warn("PAYSTACK_SECRET_KEY is not set, online payment is switched off")
+	}
+
 	categorySvc := categories.NewService(categories.NewRepository(pool))
 	productSvc := products.NewService(pool, storage, log)
+	paymentsHandler := payments.NewHandler(pool, log)
+	if paymentSvc != nil {
+		paymentsHandler.WithService(paymentSvc)
+	}
 	handlers := server.Handlers{
 		Health:        health.New(pool),
 		Auth:          auth.NewHandler(authSvc, log, cfg.IsProduction()),
@@ -79,7 +92,7 @@ func run() error {
 		Products:      products.NewHandler(productSvc, log),
 		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),
 		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
-		Orders:        orders.NewHandler(orders.NewService(pool, notifier), log),
+		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
 		Store:         store.NewHandler(pool, log),
 		Payments:      payments.NewHandler(pool, log),
@@ -105,6 +118,8 @@ func run() error {
 			<-workerDone
 		}()
 	}
+
+	go orderSvc.RunExpiry(ctx, cfg.PaymentExpiry)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

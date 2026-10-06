@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -33,6 +34,7 @@ type Config struct {
 	R2Bucket          string
 	R2PublicURL       string
 
+	PaymentExpiry      time.Duration
 	FrontendURL        string
 	EmailWorkerEnabled bool
 	StoreTimezone      string
@@ -56,6 +58,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 
+	expiryMinutes, err := strconv.Atoi(getenv("PAYMENT_EXPIRY_MINUTES", "30"))
+	if err != nil || expiryMinutes < 0 {
+		return Config{}, errors.New("PAYMENT_EXPIRY_MINUTES must be zero or a positive number")
+	}
+	expiry := time.Duration(expiryMinutes) * time.Minute
+
 	cfg := Config{
 		AppEnv: getenv("APP_ENV", "development"),
 		Port:   getenv("PORT", "8080"),
@@ -77,6 +85,7 @@ func Load() (Config, error) {
 		R2Bucket:          os.Getenv("R2_BUCKET"),
 		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 
+		PaymentExpiry:      expiry,
 		FrontendURL:        strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
 		EmailWorkerEnabled: getenv("EMAIL_WORKER_ENABLED", "true") != "false",
 		StoreTimezone:      getenv("STORE_TIMEZONE", "Africa/Lagos"),

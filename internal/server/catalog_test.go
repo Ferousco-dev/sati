@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
@@ -50,6 +51,9 @@ func (m *captureMailer) SendInvite(_ context.Context, _, email string, _ users.R
 }
 
 type catalogEnv struct {
+	pool     *pgxpool.Pool
+	orderSvc *orders.Service
+	paystack *fakePaystack
 	srv      http.Handler
 	queryRow func(query string, args ...any) pgx.Row
 	mailer   *captureMailer
@@ -80,7 +84,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs CASCADE`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs, payment_events CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
@@ -98,6 +102,11 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	notifier := notifications.NewService("http://localhost:3000", log)
 	mailer := &captureMailer{invites: map[string]string{}}
 	authSvc := auth.NewService(pool, mailer, log, "test-secret", auth.DefaultSettings())
+	paystack := newFakePaystack()
+	t.Cleanup(paystack.srv.Close)
+	orderSvc := orders.NewService(pool, notifier, log)
+	orderSvc.EnableOnline(payments.NewPaystack("sk_test", paystackWebhookSecret).WithBaseURL(paystack.srv.URL), "http://localhost:3000")
+
 	lagos, err := time.LoadLocation("Africa/Lagos")
 	if err != nil {
 		t.Fatal(err)
@@ -109,10 +118,10 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Products:      products.NewHandler(products.NewService(pool, storage, log), log),
 		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),
 		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
-		Orders:        orders.NewHandler(orders.NewService(pool, notifier), log),
+		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
 		Store:         store.NewHandler(pool, log),
-		Payments:      payments.NewHandler(pool, log),
+		Payments:      payments.NewHandler(pool, log).WithService(orderSvc),
 		Analytics:     analytics.NewHandler(analytics.NewService(pool, lagos), log),
 		Zones:         delivery.NewZoneHandler(pool, log),
 		Deliveries:    delivery.NewHandler(pool, log),
@@ -121,6 +130,9 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 
 	return &catalogEnv{
+		pool:     pool,
+		orderSvc: orderSvc,
+		paystack: paystack,
 		queryRow: func(query string, args ...any) pgx.Row {
 			return pool.QueryRow(context.Background(), query, args...)
 		},
