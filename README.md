@@ -680,23 +680,39 @@ Admin endpoints require an authenticated staff or admin session and the required
 ## Admin endpoints
 
 
-| Route                                | What it does                       |
-| ------------------------------------ | ---------------------------------- |
-| `GET /api/v1/admin/dashboard`        | Returns dashboard statistics.      |
-| `GET /api/v1/admin/orders`           | Lists store orders.                |
-| `GET /api/v1/admin/customers`        | Lists customers.                   |
-| `GET /api/v1/admin/products`         | Lists products for management.     |
-| `POST /api/v1/admin/products`        | Creates a product.                 |
-| `PATCH /api/v1/admin/products/:id`   | Updates a product.                 |
-| `GET /api/v1/admin/categories`       | Lists categories.                  |
-| `POST /api/v1/admin/categories`      | Creates a category.                |
-| `PATCH /api/v1/admin/categories/:id` | Updates a category.                |
-| `GET /api/v1/admin/payments`         | Lists payment records.             |
-| `GET /api/v1/admin/delivery`         | Lists delivery operations.         |
-| `GET /api/v1/admin/audit-logs`       | Lists administrative audit events. |
+| Route                                         | Who            | What it does                                                          |
+| --------------------------------------------- | -------------- | --------------------------------------------------------------------- |
+| `GET /api/v1/admin/dashboard`                 | STAFF, ADMIN   | Today's orders, revenue and the open order queue.                     |
+| `GET /api/v1/admin/orders`                    | STAFF, ADMIN   | Lists orders. Filters: `status`, `payment_status`, `payment_method`, `fulfillment`, `q`, `from`, `to`. |
+| `GET /api/v1/admin/orders/:id`                | STAFF, ADMIN   | Full order with customer, items and payments.                         |
+| `PATCH /api/v1/admin/orders/:id/status`       | STAFF, ADMIN   | Moves an order to its next status.                                    |
+| `POST /api/v1/admin/orders/:id/payment`       | STAFF, ADMIN   | Records a cash or bank transfer payment as received.                  |
+| `GET /api/v1/admin/payments`                  | STAFF, ADMIN   | Lists payment records.                                                |
+| `GET /api/v1/admin/customers`                 | ADMIN          | Lists customers with order counts and total spent.                    |
+| `GET/POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id/role` | ADMIN | Users and roles.                                       |
+| `GET/PATCH /api/v1/admin/settings`            | STAFF read, ADMIN write | Delivery fee, payment methods, bank account, WhatsApp.       |
+| `GET /api/v1/admin/products`, `GET /api/v1/admin/categories` | STAFF, ADMIN | Catalog for management.                                |
 
+### Working orders
 
+`PATCH /api/v1/admin/orders/:id/status` takes `{ "status": "...", "reason": "..." }` and enforces the transitions:
 
+```text
+PENDING -> CONFIRMED -> PREPARING -> READY -> COMPLETED          (pickup)
+                                      READY -> OUT_FOR_DELIVERY -> DELIVERED   (delivery)
+CANCELLED: from PENDING, CONFIRMED, PREPARING or READY
+FAILED:    from PENDING or OUT_FOR_DELIVERY
+```
+
+- `CANCELLED` and `FAILED` need a `reason` (max 200 characters). The customer sees it as `status_reason`.
+- `ONLINE` and `BANK_TRANSFER` orders cannot be confirmed until they are paid.
+- Cash orders (`PAY_ON_PICKUP`, `PAY_ON_DELIVERY`) are recorded as paid automatically when they reach `COMPLETED` or `DELIVERED`, credited to the staff member who made the change.
+- `POST /api/v1/admin/orders/:id/payment` records a payment seen by hand, with an optional `note`. For a pending bank transfer order it also confirms the order. A second payment on the same order returns `ALREADY_PAID`, even when two staff click at once.
+- Every manual payment is stored in the `payments` table with who recorded it and when.
+
+### Dashboard
+
+"Today" starts at midnight in the store timezone (`STORE_TIMEZONE`, default `Africa/Lagos`). Pass `?tz=Europe/London` with the viewer's own timezone, for example from `Intl.DateTimeFormat().resolvedOptions().timeZone` in the browser, to see their own day instead. All timestamps in the API are UTC, so the frontend shows them in the customer's local time.
 
 ## Files and images
 

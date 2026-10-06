@@ -5,6 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -13,7 +16,6 @@ import (
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
-	"time"
 )
 
 var (
@@ -75,6 +77,59 @@ func (s *Service) ChangeRole(ctx context.Context, actorID, targetID string, role
 	return s.users.ByID(ctx, s.pool, targetID)
 }
 
+type Customer struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Email          string    `json:"email"`
+	EmailVerified  bool      `json:"email_verified"`
+	OrdersCount    int       `json:"orders_count"`
+	TotalSpentKobo int64     `json:"total_spent_kobo"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type CustomerPage struct {
+	Customers []Customer `json:"customers"`
+	Total     int        `json:"total"`
+	Limit     int        `json:"limit"`
+	Offset    int        `json:"offset"`
+}
+
+func (s *Service) ListCustomers(ctx context.Context, query string, limit, offset int) (CustomerPage, error) {
+	query = strings.TrimSpace(query)
+	if utf8.RuneCountInString(query) > 100 {
+		return CustomerPage{}, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", "Search text is too long")
+	}
+	pattern := ""
+	if query != "" {
+		pattern = "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query) + "%"
+	}
+	where := `u.role = 'CUSTOMER' AND ($1 = '' OR u.name ILIKE $1 OR u.email::text ILIKE $1)`
+
+	page := CustomerPage{Customers: []Customer{}, Limit: limit, Offset: offset}
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM users u WHERE `+where, pattern).Scan(&page.Total); err != nil {
+		return CustomerPage{}, err
+	}
+
+	rows, err := s.pool.Query(ctx,
+		`SELECT u.id::text, u.name, u.email::text, u.email_verified, u.created_at,
+		        count(o.id), COALESCE(sum(o.total_kobo) FILTER (WHERE o.payment_status = 'PAID'), 0)
+		 FROM users u LEFT JOIN orders o ON o.customer_id = u.id
+		 WHERE `+where+` GROUP BY u.id ORDER BY u.created_at DESC, u.id LIMIT $2 OFFSET $3`, pattern, limit, offset)
+	if err != nil {
+		return CustomerPage{}, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c Customer
+		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.EmailVerified, &c.CreatedAt, &c.OrdersCount, &c.TotalSpentKobo); err != nil {
+			return CustomerPage{}, err
+		}
+		page.Customers = append(page.Customers, c)
+	}
+	return page, rows.Err()
+}
+
 type Handler struct {
 	svc *Service
 	log *slog.Logger
@@ -83,6 +138,7 @@ type Handler struct {
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
 func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+	mux.Handle("GET /api/v1/admin/customers", access.Admin(http.HandlerFunc(h.customers)))
 	mux.Handle("GET /api/v1/admin/users", access.Admin(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/v1/admin/users", access.Admin(http.HandlerFunc(h.invite)))
 	mux.Handle("PATCH /api/v1/admin/users/{id}/role", access.Admin(http.HandlerFunc(h.changeRole)))
@@ -95,6 +151,16 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page, err := h.svc.ListUsers(r.Context(), users.Role(r.URL.Query().Get("role")), limit, offset)
+	h.respond(w, r, http.StatusOK, page, err)
+}
+
+func (h *Handler) customers(w http.ResponseWriter, r *http.Request) {
+	limit, offset, perr := httpx.Pagination(r)
+	if perr != nil {
+		apierror.Write(w, perr)
+		return
+	}
+	page, err := h.svc.ListCustomers(r.Context(), r.URL.Query().Get("q"), limit, offset)
 	h.respond(w, r, http.StatusOK, page, err)
 }
 

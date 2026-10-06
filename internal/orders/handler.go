@@ -30,7 +30,7 @@ func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
 	mux.Handle("GET /api/v1/orders/{id}/status", access.Customer(http.HandlerFunc(h.status)))
 }
 
-func customerID(r *http.Request) string {
+func userID(r *http.Request) string {
 	id, _ := auth.IdentityFrom(r.Context())
 	return id.User.ID
 }
@@ -50,7 +50,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, err)
 		return
 	}
-	order, created, err := h.svc.Create(r.Context(), customerID(r), in, r.Header.Get("Idempotency-Key"))
+	order, created, err := h.svc.Create(r.Context(), userID(r), in, r.Header.Get("Idempotency-Key"))
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -68,7 +68,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, perr)
 		return
 	}
-	page, err := h.svc.List(r.Context(), customerID(r), limit, offset)
+	page, err := h.svc.List(r.Context(), userID(r), limit, offset)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -77,7 +77,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
-	order, err := h.svc.Get(r.Context(), customerID(r), r.PathValue("id"))
+	order, err := h.svc.Get(r.Context(), userID(r), r.PathValue("id"))
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -86,7 +86,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
-	order, err := h.svc.Cancel(r.Context(), customerID(r), r.PathValue("id"))
+	order, err := h.svc.Cancel(r.Context(), userID(r), r.PathValue("id"))
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -95,7 +95,7 @@ func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
-	view, err := h.svc.Status(r.Context(), customerID(r), r.PathValue("id"))
+	view, err := h.svc.Status(r.Context(), userID(r), r.PathValue("id"))
 	if err != nil {
 		h.fail(w, r, err)
 		return

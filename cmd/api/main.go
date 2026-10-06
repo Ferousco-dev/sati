@@ -12,12 +12,14 @@ import (
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
+	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
+	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/server"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
@@ -60,6 +62,11 @@ func run() error {
 		return err
 	}
 
+	storeLocation, err := time.LoadLocation(cfg.StoreTimezone)
+	if err != nil {
+		return err
+	}
+
 	categorySvc := categories.NewService(categories.NewRepository(pool))
 	productSvc := products.NewService(pool, storage, log)
 	handlers := server.Handlers{
@@ -71,6 +78,8 @@ func run() error {
 		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
 		Orders:     orders.NewHandler(orders.NewService(pool), log),
 		Store:      store.NewHandler(pool, log),
+		Payments:   payments.NewHandler(pool, log),
+		Analytics:  analytics.NewHandler(analytics.NewService(pool, storeLocation), log),
 		LocalFiles: storage.Handler(),
 	}
 

@@ -81,6 +81,7 @@ type Order struct {
 	Currency            string               `json:"currency"`
 	DeliveryAddress     *addresses.Address   `json:"delivery_address"`
 	Notes               string               `json:"notes"`
+	StatusReason        string               `json:"status_reason,omitempty"`
 	PaymentInstructions *PaymentInstructions `json:"payment_instructions"`
 	Items               []Item               `json:"items"`
 	CreatedAt           time.Time            `json:"created_at"`

@@ -4,26 +4,32 @@ import "testing"
 
 func TestValidate(t *testing.T) {
 	t.Run("requires database url", func(t *testing.T) {
-		if err := (Config{AppEnv: "development", StorageDriver: "local"}).validate(); err == nil {
+		if err := (Config{AppEnv: "development", StorageDriver: "local", StoreTimezone: "Africa/Lagos"}).validate(); err == nil {
 			t.Fatal("expected error")
 		}
 	})
 
 	t.Run("development needs only database url", func(t *testing.T) {
-		if err := (Config{AppEnv: "development", DatabaseURL: "postgres://x", StorageDriver: "local"}).validate(); err != nil {
+		if err := (Config{AppEnv: "development", DatabaseURL: "postgres://x", StorageDriver: "local", StoreTimezone: "Africa/Lagos"}).validate(); err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("production refuses missing secrets", func(t *testing.T) {
-		if err := (Config{AppEnv: "production", DatabaseURL: "postgres://x", StorageDriver: "local"}).validate(); err == nil {
+		if err := (Config{AppEnv: "production", DatabaseURL: "postgres://x", StorageDriver: "local", StoreTimezone: "Africa/Lagos"}).validate(); err == nil {
 			t.Fatal("expected error")
 		}
 	})
 }
 
 func TestStorageDriverMustBeKnown(t *testing.T) {
-	if err := (Config{AppEnv: "development", DatabaseURL: "postgres://x", StorageDriver: "ftp"}).validate(); err == nil {
+	if err := (Config{AppEnv: "development", DatabaseURL: "postgres://x", StorageDriver: "ftp", StoreTimezone: "Africa/Lagos"}).validate(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestStoreTimezoneMustBeValid(t *testing.T) {
+	if err := (Config{AppEnv: "development", DatabaseURL: "postgres://x", StorageDriver: "local", StoreTimezone: "Mars/Base"}).validate(); err == nil {
 		t.Fatal("expected error")
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"time"
+	_ "time/tzdata"
 
 	"github.com/joho/godotenv"
 )
@@ -31,6 +33,7 @@ type Config struct {
 	R2Bucket          string
 	R2PublicURL       string
 
+	StoreTimezone string
 	StorageDriver string
 	UploadDir     string
 	AssetBaseURL  string
@@ -72,6 +75,7 @@ func Load() (Config, error) {
 		R2Bucket:          os.Getenv("R2_BUCKET"),
 		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 
+		StoreTimezone: getenv("STORE_TIMEZONE", "Africa/Lagos"),
 		StorageDriver: getenv("STORAGE_DRIVER", "local"),
 		UploadDir:     getenv("UPLOAD_DIR", "uploads"),
 		AssetBaseURL:  os.Getenv("ASSET_BASE_URL"),
@@ -89,6 +93,9 @@ func Load() (Config, error) {
 func (c Config) validate() error {
 	if c.DatabaseURL == "" {
 		return errors.New("DATABASE_URL is required")
+	}
+	if _, err := time.LoadLocation(c.StoreTimezone); err != nil {
+		return fmt.Errorf("STORE_TIMEZONE is not a valid timezone: %w", err)
 	}
 	if c.StorageDriver != "local" && c.StorageDriver != "r2" {
 		return errors.New("STORAGE_DRIVER must be local or r2")

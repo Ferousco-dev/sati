@@ -11,10 +11,12 @@ import (
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
+	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
+	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
@@ -36,6 +38,8 @@ func newTestServer(pingErr error) http.Handler {
 		Addresses:  addresses.NewHandler(nil, log),
 		Orders:     orders.NewHandler(nil, log),
 		Store:      store.NewHandler(nil, log),
+		Payments:   payments.NewHandler(nil, log),
+		Analytics:  analytics.NewHandler(nil, log),
 	}
 	return New(cfg, log, handlers)
 }

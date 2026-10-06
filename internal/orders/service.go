@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
+	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
@@ -32,6 +33,7 @@ type Service struct {
 	repo      *Repository
 	addresses *addresses.Repository
 	store     *store.Repository
+	payments  *payments.Repository
 	now       func() time.Time
 }
 
@@ -41,6 +43,7 @@ func NewService(pool *pgxpool.Pool) *Service {
 		repo:      NewRepository(),
 		addresses: addresses.NewRepository(),
 		store:     store.NewRepository(),
+		payments:  payments.NewRepository(),
 		now:       time.Now,
 	}
 }

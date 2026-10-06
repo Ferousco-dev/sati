@@ -6,11 +6,13 @@ import (
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
+	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
+	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
@@ -27,6 +29,8 @@ type Handlers struct {
 	Addresses  *addresses.Handler
 	Orders     *orders.Handler
 	Store      *store.Handler
+	Payments   *payments.Handler
+	Analytics  *analytics.Handler
 	LocalFiles http.Handler
 }
 
@@ -42,6 +46,9 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
 	h.Admin.Mount(mux, access)
 	h.Addresses.Mount(mux, access)
 	h.Orders.Mount(mux, access)
+	h.Orders.MountStaff(mux, access)
+	h.Payments.Mount(mux, access)
+	h.Analytics.Mount(mux, access)
 	h.Store.Mount(mux, access)
 	if h.LocalFiles != nil {
 		mux.Handle("GET "+files.LocalURLPrefix, h.LocalFiles)

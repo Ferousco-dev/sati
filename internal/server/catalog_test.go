@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -21,11 +22,13 @@ import (
 	"github.com/Ferousco-dev/sati/backend/db"
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
+	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
+	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/internal/users"
@@ -90,6 +93,10 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 
 	mailer := &captureMailer{invites: map[string]string{}}
 	authSvc := auth.NewService(pool, mailer, log, "test-secret", auth.DefaultSettings())
+	lagos, err := time.LoadLocation("Africa/Lagos")
+	if err != nil {
+		t.Fatal(err)
+	}
 	handlers := Handlers{
 		Health:     health.New(pool),
 		Auth:       auth.NewHandler(authSvc, log, false),
@@ -99,6 +106,8 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
 		Orders:     orders.NewHandler(orders.NewService(pool), log),
 		Store:      store.NewHandler(pool, log),
+		Payments:   payments.NewHandler(pool, log),
+		Analytics:  analytics.NewHandler(analytics.NewService(pool, lagos), log),
 		LocalFiles: storage.Handler(),
 	}
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}

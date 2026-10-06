@@ -15,7 +15,7 @@ import (
 
 const columns = `o.id::text, o.order_number, o.status::text, o.payment_status::text, o.payment_method::text,
 	o.fulfillment_type::text, o.subtotal_kobo, o.delivery_fee_kobo, o.total_kobo, o.delivery_address,
-	o.notes, o.created_at, o.updated_at`
+	o.notes, o.status_reason, o.created_at, o.updated_at`
 
 type productRow struct {
 	ID        string
@@ -49,13 +49,14 @@ type Repository struct{}
 
 func NewRepository() *Repository { return &Repository{} }
 
-func scan(row pgx.Row) (Order, error) {
+func scan(row pgx.Row, extra ...any) (Order, error) {
 	var o Order
 	var number int64
 	var status, fulfillment, method string
 	var snapshot []byte
-	err := row.Scan(&o.ID, &number, &status, &o.PaymentStatus, &method, &fulfillment,
-		&o.SubtotalKobo, &o.DeliveryFeeKobo, &o.TotalKobo, &snapshot, &o.Notes, &o.CreatedAt, &o.UpdatedAt)
+	dest := append([]any{&o.ID, &number, &status, &o.PaymentStatus, &method, &fulfillment,
+		&o.SubtotalKobo, &o.DeliveryFeeKobo, &o.TotalKobo, &snapshot, &o.Notes, &o.StatusReason, &o.CreatedAt, &o.UpdatedAt}, extra...)
+	err := row.Scan(dest...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Order{}, ErrNotFound
 	}
