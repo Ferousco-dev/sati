@@ -93,15 +93,6 @@ func TestValidateCreate(t *testing.T) {
 
 func ptr[T any](v T) *T { return &v }
 
-func TestFormatNaira(t *testing.T) {
-	tests := map[int64]string{0: "\u20a60.00", 5: "\u20a60.05", 750000: "\u20a67,500.00", 123456789: "\u20a61,234,567.89"}
-	for kobo, want := range tests {
-		if got := formatNaira(kobo); got != want {
-			t.Errorf("%d: got %s, want %s", kobo, got, want)
-		}
-	}
-}
-
 func TestWhatsAppURL(t *testing.T) {
 	got := whatsAppURL("2348012345678", "Paid for {order_number}, total {total}", "SATI-10001", 750000)
 	want := "https://wa.me/2348012345678?text=Paid+for+SATI-10001%2C+total+%E2%82%A67%2C500.00"

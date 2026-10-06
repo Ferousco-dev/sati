@@ -16,6 +16,7 @@ import (
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
+	"github.com/Ferousco-dev/sati/backend/internal/notifications"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/internal/users"
@@ -39,10 +40,11 @@ type Service struct {
 	zones     *delivery.ZoneRepository
 	delivery  *delivery.Repository
 	users     *users.Repository
+	notify    *notifications.Service
 	now       func() time.Time
 }
 
-func NewService(pool *pgxpool.Pool) *Service {
+func NewService(pool *pgxpool.Pool, notify *notifications.Service) *Service {
 	return &Service{
 		pool:      pool,
 		repo:      NewRepository(),
@@ -52,6 +54,7 @@ func NewService(pool *pgxpool.Pool) *Service {
 		zones:     delivery.NewZoneRepository(),
 		delivery:  delivery.NewRepository(),
 		users:     users.NewRepository(),
+		notify:    notify,
 		now:       time.Now,
 	}
 }
@@ -187,7 +190,12 @@ func (s *Service) place(ctx context.Context, tx pgx.Tx, customerID string, in Cr
 	}
 	order.TotalKobo = order.SubtotalKobo + order.DeliveryFeeKobo
 
-	return s.repo.Insert(ctx, tx, order, items)
+	id, number, err := s.repo.Insert(ctx, tx, order, items)
+	if err != nil {
+		return "", err
+	}
+	s.announcePlaced(ctx, tx, id, number, order, items, settings)
+	return id, nil
 }
 
 // deliveryFee uses the fee of the zone chosen on the address. A store that
@@ -261,7 +269,16 @@ func (s *Service) Cancel(ctx context.Context, customerID, id string) (Order, err
 	if !httpx.ValidUUID(id) {
 		return Order{}, ErrNotFound
 	}
-	cancelled, err := s.repo.Cancel(ctx, s.pool, customerID, id, s.now())
+	now := s.now()
+	var cancelled bool
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		if cancelled, err = s.repo.Cancel(ctx, tx, customerID, id, now); err != nil || !cancelled {
+			return err
+		}
+		s.emitStatus(ctx, tx, id, StatusCancelled, "Cancelled at your request")
+		return nil
+	})
 	if err != nil {
 		return Order{}, err
 	}

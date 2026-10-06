@@ -33,10 +33,12 @@ type Config struct {
 	R2Bucket          string
 	R2PublicURL       string
 
-	StoreTimezone string
-	StorageDriver string
-	UploadDir     string
-	AssetBaseURL  string
+	FrontendURL        string
+	EmailWorkerEnabled bool
+	StoreTimezone      string
+	StorageDriver      string
+	UploadDir          string
+	AssetBaseURL       string
 
 	TrustedProxies     []netip.Prefix
 	CORSAllowedOrigins []string
@@ -75,10 +77,12 @@ func Load() (Config, error) {
 		R2Bucket:          os.Getenv("R2_BUCKET"),
 		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 
-		StoreTimezone: getenv("STORE_TIMEZONE", "Africa/Lagos"),
-		StorageDriver: getenv("STORAGE_DRIVER", "local"),
-		UploadDir:     getenv("UPLOAD_DIR", "uploads"),
-		AssetBaseURL:  os.Getenv("ASSET_BASE_URL"),
+		FrontendURL:        strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
+		EmailWorkerEnabled: getenv("EMAIL_WORKER_ENABLED", "true") != "false",
+		StoreTimezone:      getenv("STORE_TIMEZONE", "Africa/Lagos"),
+		StorageDriver:      getenv("STORAGE_DRIVER", "local"),
+		UploadDir:          getenv("UPLOAD_DIR", "uploads"),
+		AssetBaseURL:       os.Getenv("ASSET_BASE_URL"),
 
 		TrustedProxies:     proxies,
 		CORSAllowedOrigins: splitList(os.Getenv("CORS_ALLOWED_ORIGINS")),
@@ -116,6 +120,7 @@ func (c Config) validate() error {
 		"R2_BUCKET":               c.R2Bucket,
 		"R2_PUBLIC_URL":           c.R2PublicURL,
 		"CORS_ALLOWED_ORIGINS":    strings.Join(c.CORSAllowedOrigins, ","),
+		"FRONTEND_URL":            os.Getenv("FRONTEND_URL"),
 	}
 
 	var missing []string

@@ -106,22 +106,23 @@ func (Repository) LockProducts(ctx context.Context, db database.DBTX, ids []stri
 
 var errDuplicateKey = errors.New("duplicate idempotency key")
 
-func (Repository) Insert(ctx context.Context, db database.DBTX, in newOrder, items []newItem) (string, error) {
+func (Repository) Insert(ctx context.Context, db database.DBTX, in newOrder, items []newItem) (string, int64, error) {
 	var id string
+	var number int64
 	err := db.QueryRow(ctx,
 		`INSERT INTO orders (customer_id, fulfillment_type, subtotal_kobo, delivery_fee_kobo, total_kobo,
 		                     payment_method, delivery_address_id, delivery_address, notes, idempotency_key)
 		 VALUES ($1, $2::fulfillment_type, $3, $4, $5, $6::payment_method, $7, $8::jsonb, $9, $10)
-		 RETURNING id::text`,
+		 RETURNING id::text, order_number`,
 		in.CustomerID, string(in.Fulfillment), in.SubtotalKobo, in.DeliveryFeeKobo, in.TotalKobo,
-		string(in.PaymentMethod), in.AddressID, in.AddressSnapshot, in.Notes, in.IdempotencyKey).Scan(&id)
+		string(in.PaymentMethod), in.AddressID, in.AddressSnapshot, in.Notes, in.IdempotencyKey).Scan(&id, &number)
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return "", errDuplicateKey
+		return "", 0, errDuplicateKey
 	}
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	productIDs := make([]string, len(items))
@@ -136,7 +137,7 @@ func (Repository) Insert(ctx context.Context, db database.DBTX, in newOrder, ite
 		`INSERT INTO order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot_kobo, quantity, line_total_kobo)
 		 SELECT $1, * FROM unnest($2::uuid[], $3::text[], $4::bigint[], $5::int[], $6::bigint[])`,
 		id, productIDs, names, prices, quantities, totals)
-	return id, err
+	return id, number, err
 }
 
 func (Repository) ByID(ctx context.Context, db database.DBTX, customerID, id string) (Order, error) {

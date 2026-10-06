@@ -12,6 +12,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/notifications"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
@@ -22,19 +23,20 @@ import (
 )
 
 type Handlers struct {
-	Health     *health.Handler
-	Auth       *auth.Handler
-	Categories *categories.Handler
-	Products   *products.Handler
-	Admin      *admin.Handler
-	Addresses  *addresses.Handler
-	Orders     *orders.Handler
-	Store      *store.Handler
-	Payments   *payments.Handler
-	Analytics  *analytics.Handler
-	Zones      *delivery.ZoneHandler
-	Deliveries *delivery.Handler
-	LocalFiles http.Handler
+	Health        *health.Handler
+	Auth          *auth.Handler
+	Categories    *categories.Handler
+	Products      *products.Handler
+	Admin         *admin.Handler
+	Addresses     *addresses.Handler
+	Orders        *orders.Handler
+	Store         *store.Handler
+	Payments      *payments.Handler
+	Analytics     *analytics.Handler
+	Notifications *notifications.Handler
+	Zones         *delivery.ZoneHandler
+	Deliveries    *delivery.Handler
+	LocalFiles    http.Handler
 }
 
 func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
@@ -52,6 +54,7 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) http.Handler {
 	h.Orders.MountStaff(mux, access)
 	h.Payments.Mount(mux, access)
 	h.Analytics.Mount(mux, access)
+	h.Notifications.Mount(mux, access)
 	h.Zones.Mount(mux, access)
 	h.Deliveries.Mount(mux, access)
 	h.Store.Mount(mux, access)

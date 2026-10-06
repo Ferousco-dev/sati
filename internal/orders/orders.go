@@ -9,6 +9,7 @@ import (
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
+	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 )
 
@@ -174,24 +175,13 @@ func CanTransition(from, to Status, f Fulfillment) bool {
 	return false
 }
 
-func formatNaira(kobo int64) string {
-	naira := fmt.Sprintf("%d", kobo/100)
-	var grouped []string
-	for len(naira) > 3 {
-		grouped = append([]string{naira[len(naira)-3:]}, grouped...)
-		naira = naira[:len(naira)-3]
-	}
-	grouped = append([]string{naira}, grouped...)
-	return fmt.Sprintf("\u20a6%s.%02d", strings.Join(grouped, ","), kobo%100)
-}
-
 func whatsAppURL(number, template, orderNumber string, totalKobo int64) string {
 	if number == "" {
 		return ""
 	}
 	message := strings.NewReplacer(
 		"{order_number}", orderNumber,
-		"{total}", formatNaira(totalKobo),
+		"{total}", email.Naira(totalKobo),
 	).Replace(template)
 	return "https://wa.me/" + number + "?text=" + url.QueryEscape(message)
 }

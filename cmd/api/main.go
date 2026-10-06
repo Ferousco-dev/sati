@@ -19,6 +19,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/notifications"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
@@ -52,7 +53,8 @@ func run() error {
 	}
 	defer pool.Close()
 
-	mailer := email.NewLogMailer(log, !cfg.IsProduction())
+	notifier := notifications.NewService(cfg.FrontendURL, log)
+	mailer := notifications.NewMailer(notifier, pool)
 	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
 
 	storage, err := files.NewLocalStorage(cfg.UploadDir, cfg.AssetBaseURL)
@@ -71,19 +73,37 @@ func run() error {
 	categorySvc := categories.NewService(categories.NewRepository(pool))
 	productSvc := products.NewService(pool, storage, log)
 	handlers := server.Handlers{
-		Health:     health.New(pool),
-		Auth:       auth.NewHandler(authSvc, log, cfg.IsProduction()),
-		Categories: categories.NewHandler(categorySvc, log),
-		Products:   products.NewHandler(productSvc, log),
-		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
-		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
-		Orders:     orders.NewHandler(orders.NewService(pool), log),
-		Store:      store.NewHandler(pool, log),
-		Payments:   payments.NewHandler(pool, log),
-		Analytics:  analytics.NewHandler(analytics.NewService(pool, storeLocation), log),
-		Zones:      delivery.NewZoneHandler(pool, log),
-		Deliveries: delivery.NewHandler(pool, log),
-		LocalFiles: storage.Handler(),
+		Health:        health.New(pool),
+		Auth:          auth.NewHandler(authSvc, log, cfg.IsProduction()),
+		Categories:    categories.NewHandler(categorySvc, log),
+		Products:      products.NewHandler(productSvc, log),
+		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),
+		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
+		Orders:        orders.NewHandler(orders.NewService(pool, notifier), log),
+		Notifications: notifications.NewHandler(pool, log),
+		Store:         store.NewHandler(pool, log),
+		Payments:      payments.NewHandler(pool, log),
+		Analytics:     analytics.NewHandler(analytics.NewService(pool, storeLocation), log),
+		Zones:         delivery.NewZoneHandler(pool, log),
+		Deliveries:    delivery.NewHandler(pool, log),
+		LocalFiles:    storage.Handler(),
+	}
+
+	if cfg.EmailWorkerEnabled {
+		var sender email.Sender = email.NewLogSender(log, !cfg.IsProduction())
+		if cfg.ResendAPIKey != "" && cfg.EmailFrom != "" {
+			sender = email.NewResendSender(cfg.ResendAPIKey, cfg.EmailFrom)
+		}
+		worker := notifications.NewWorker(pool, sender, log)
+		workerDone := make(chan struct{})
+		go func() {
+			defer close(workerDone)
+			worker.Run(ctx)
+		}()
+		defer func() {
+			stop()
+			<-workerDone
+		}()
 	}
 
 	srv := &http.Server{

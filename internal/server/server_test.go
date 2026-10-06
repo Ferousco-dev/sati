@@ -16,6 +16,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/notifications"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
@@ -31,18 +32,19 @@ func newTestServer(pingErr error) http.Handler {
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	handlers := Handlers{
-		Health:     health.New(fakePinger{err: pingErr}),
-		Auth:       auth.NewHandler(nil, log, false),
-		Categories: categories.NewHandler(nil, log),
-		Products:   products.NewHandler(nil, log),
-		Admin:      admin.NewHandler(nil, log),
-		Addresses:  addresses.NewHandler(nil, log),
-		Orders:     orders.NewHandler(nil, log),
-		Store:      store.NewHandler(nil, log),
-		Payments:   payments.NewHandler(nil, log),
-		Analytics:  analytics.NewHandler(nil, log),
-		Zones:      delivery.NewZoneHandler(nil, log),
-		Deliveries: delivery.NewHandler(nil, log),
+		Health:        health.New(fakePinger{err: pingErr}),
+		Auth:          auth.NewHandler(nil, log, false),
+		Categories:    categories.NewHandler(nil, log),
+		Products:      products.NewHandler(nil, log),
+		Admin:         admin.NewHandler(nil, log),
+		Addresses:     addresses.NewHandler(nil, log),
+		Orders:        orders.NewHandler(nil, log),
+		Store:         store.NewHandler(nil, log),
+		Payments:      payments.NewHandler(nil, log),
+		Analytics:     analytics.NewHandler(nil, log),
+		Notifications: notifications.NewHandler(nil, log),
+		Zones:         delivery.NewZoneHandler(nil, log),
+		Deliveries:    delivery.NewHandler(nil, log),
 	}
 	return New(cfg, log, handlers)
 }

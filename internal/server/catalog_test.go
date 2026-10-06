@@ -29,6 +29,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/notifications"
 	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/payments"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
@@ -79,12 +80,12 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones CASCADE`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
 		bank_transfer_enabled = TRUE, pay_on_pickup_enabled = TRUE, pay_on_delivery_enabled = TRUE,
-		bank_name = '', bank_account_number = '', bank_account_name = '', whatsapp_number = ''`); err != nil {
+		bank_name = '', bank_account_number = '', bank_account_name = '', whatsapp_number = '', notification_email = ''`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,6 +95,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 
+	notifier := notifications.NewService("http://localhost:3000", log)
 	mailer := &captureMailer{invites: map[string]string{}}
 	authSvc := auth.NewService(pool, mailer, log, "test-secret", auth.DefaultSettings())
 	lagos, err := time.LoadLocation("Africa/Lagos")
@@ -101,19 +103,20 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	handlers := Handlers{
-		Health:     health.New(pool),
-		Auth:       auth.NewHandler(authSvc, log, false),
-		Categories: categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),
-		Products:   products.NewHandler(products.NewService(pool, storage, log), log),
-		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
-		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
-		Orders:     orders.NewHandler(orders.NewService(pool), log),
-		Store:      store.NewHandler(pool, log),
-		Payments:   payments.NewHandler(pool, log),
-		Analytics:  analytics.NewHandler(analytics.NewService(pool, lagos), log),
-		Zones:      delivery.NewZoneHandler(pool, log),
-		Deliveries: delivery.NewHandler(pool, log),
-		LocalFiles: storage.Handler(),
+		Health:        health.New(pool),
+		Auth:          auth.NewHandler(authSvc, log, false),
+		Categories:    categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),
+		Products:      products.NewHandler(products.NewService(pool, storage, log), log),
+		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),
+		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
+		Orders:        orders.NewHandler(orders.NewService(pool, notifier), log),
+		Notifications: notifications.NewHandler(pool, log),
+		Store:         store.NewHandler(pool, log),
+		Payments:      payments.NewHandler(pool, log),
+		Analytics:     analytics.NewHandler(analytics.NewService(pool, lagos), log),
+		Zones:         delivery.NewZoneHandler(pool, log),
+		Deliveries:    delivery.NewHandler(pool, log),
+		LocalFiles:    storage.Handler(),
 	}
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
 

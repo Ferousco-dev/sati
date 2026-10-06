@@ -281,6 +281,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID, id string, to Statu
 		if err := s.collectCash(ctx, tx, id, cur, to, actorID, now); err != nil {
 			return err
 		}
+		s.emitStatus(ctx, tx, id, to, reason)
 		result, err = s.staffGet(ctx, tx, id)
 		return err
 	})
@@ -333,11 +334,13 @@ func (s *Service) RecordPayment(ctx context.Context, actorID, id, note string) (
 		if err := s.repo.setPaid(ctx, tx, id, now); err != nil {
 			return err
 		}
-		if cur.Method == BankTransfer && cur.Status == StatusPending {
+		confirmed := cur.Method == BankTransfer && cur.Status == StatusPending
+		if confirmed {
 			if err := s.repo.setStatus(ctx, tx, id, StatusConfirmed, "", now); err != nil {
 				return err
 			}
 		}
+		s.emitPayment(ctx, tx, id, confirmed)
 		result, err = s.staffGet(ctx, tx, id)
 		return err
 	})

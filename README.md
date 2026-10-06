@@ -653,20 +653,37 @@ If Redis becomes unavailable, features that do not depend on it should continue 
 
 ## Notifications
 
-SATI sends transactional emails through Resend.
+SATI sends transactional emails through Resend and shows the same events inside the app.
 
-Important emails include:
+An email is never sent during the request that causes it. The event is saved to an `email_jobs` table in the same database transaction as the order or account change, and a background worker sends it. The worker runs inside the API process (`EMAIL_WORKER_ENABLED=false` turns it off) and several instances can run at once without sending anything twice. If Resend is down the order is unaffected: sends are retried 5 times with growing delays (30 seconds, 2 minutes, 8 minutes, 32 minutes), and addresses Resend rejects are not retried. A failure to queue a notification is logged and never fails an order.
 
-- Email verification
-- Password reset
-- Order confirmation
-- Payment confirmation
-- Order status changes
-- Order ready for pickup
-- Out-for-delivery notification
-- Delivery confirmation
+Sent jobs have their content wiped, because it can contain sign-in links, and old jobs are deleted after 14 days (30 for failed ones).
 
-Email delivery should not block the core order transaction. Where background jobs are enabled, the order is committed first and the notification is processed separately.
+Without `RESEND_API_KEY` and `EMAIL_FROM` the emails are written to the log instead, with their text outside production. Links in emails use `FRONTEND_URL`: `/verify-email?token=`, `/reset-password?token=` (also used by staff invites), `/orders/:id`, and `/admin/orders/:id` for the store alert.
+
+| Event | Email | In the app |
+| --- | --- | --- |
+| Registration | Verify your email | |
+| Forgot password | Reset your password | |
+| Staff invite | Set your password | |
+| Order placed | Confirmation with items, total and bank details when relevant | yes |
+| Order placed | Alert to `notification_email`, if set in settings | |
+| Payment recorded | Payment received (one email, also says the order is confirmed when it was) | yes |
+| Confirmed | Order confirmed | yes |
+| Preparing | | yes |
+| Ready | Ready for pickup (pickup orders only) | yes |
+| Out for delivery | On its way | yes |
+| Delivered or completed | Delivered or completed | yes |
+| Cancelled or failed | The reason is included | yes |
+
+In-app notifications are for signed-in users and are never cached:
+
+| Route                                    | What it does                              |
+| ---------------------------------------- | ----------------------------------------- |
+| `GET /api/v1/notifications`              | Lists notifications. `?unread=true` filters. Includes `unread_count`. |
+| `GET /api/v1/notifications/unread-count` | Cheap count for a bell icon.              |
+| `POST /api/v1/notifications/:id/read`    | Marks one as read.                        |
+| `POST /api/v1/notifications/read-all`    | Marks everything as read.                 |
 
 ## Admin
 

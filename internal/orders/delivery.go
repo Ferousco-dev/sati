@@ -216,6 +216,10 @@ func (s *Service) RiderUpdateStatus(ctx context.Context, riderID, deliveryID, st
 			}
 		}
 
+		if orderStatus != cur.Status {
+			s.emitStatus(ctx, tx, orderID, orderStatus, "")
+		}
+
 		updated, err := s.delivery.ByOrder(ctx, tx, orderID, false)
 		if err != nil {
 			return err

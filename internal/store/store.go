@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,6 +32,7 @@ type Settings struct {
 	BankAccountName      string    `json:"bank_account_name"`
 	WhatsAppNumber       string    `json:"whatsapp_number"`
 	WhatsAppMessage      string    `json:"whatsapp_message"`
+	NotificationEmail    string    `json:"notification_email"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
@@ -45,6 +47,7 @@ type UpdateInput struct {
 	BankAccountName      *string `json:"bank_account_name"`
 	WhatsAppNumber       *string `json:"whatsapp_number"`
 	WhatsAppMessage      *string `json:"whatsapp_message"`
+	NotificationEmail    *string `json:"notification_email"`
 }
 
 func (s Settings) BankTransferReady() bool {
@@ -53,7 +56,7 @@ func (s Settings) BankTransferReady() bool {
 
 const columns = `delivery_fee_kobo, online_enabled, bank_transfer_enabled, pay_on_pickup_enabled,
 	pay_on_delivery_enabled, bank_name, bank_account_number, bank_account_name,
-	whatsapp_number, whatsapp_message, updated_at`
+	whatsapp_number, whatsapp_message, notification_email, updated_at`
 
 type Repository struct{}
 
@@ -67,7 +70,7 @@ func scan(row interface{ Scan(...any) error }) (Settings, error) {
 	var s Settings
 	err := row.Scan(&s.DeliveryFeeKobo, &s.OnlineEnabled, &s.BankTransferEnabled, &s.PayOnPickupEnabled,
 		&s.PayOnDeliveryEnabled, &s.BankName, &s.BankAccountNumber, &s.BankAccountName,
-		&s.WhatsAppNumber, &s.WhatsAppMessage, &s.UpdatedAt)
+		&s.WhatsAppNumber, &s.WhatsAppMessage, &s.NotificationEmail, &s.UpdatedAt)
 	return s, err
 }
 
@@ -84,11 +87,12 @@ func (Repository) Update(ctx context.Context, db database.DBTX, in UpdateInput, 
 		   bank_account_name = COALESCE($8, bank_account_name),
 		   whatsapp_number = COALESCE($9, whatsapp_number),
 		   whatsapp_message = COALESCE($10, whatsapp_message),
-		   updated_at = $11
+		   notification_email = COALESCE($11, notification_email),
+		   updated_at = $12
 		 RETURNING `+columns,
 		in.DeliveryFeeKobo, in.OnlineEnabled, in.BankTransferEnabled, in.PayOnPickupEnabled,
 		in.PayOnDeliveryEnabled, in.BankName, in.BankAccountNumber, in.BankAccountName,
-		in.WhatsAppNumber, in.WhatsAppMessage, now))
+		in.WhatsAppNumber, in.WhatsAppMessage, in.NotificationEmail, now))
 }
 
 type Handler struct {
@@ -135,7 +139,7 @@ func (in *UpdateInput) normalize() *apierror.Error {
 	if in.DeliveryFeeKobo == nil && in.OnlineEnabled == nil && in.BankTransferEnabled == nil &&
 		in.PayOnPickupEnabled == nil && in.PayOnDeliveryEnabled == nil && in.BankName == nil &&
 		in.BankAccountNumber == nil && in.BankAccountName == nil && in.WhatsAppNumber == nil &&
-		in.WhatsAppMessage == nil {
+		in.WhatsAppMessage == nil && in.NotificationEmail == nil {
 		return validation("No fields to update")
 	}
 	if in.DeliveryFeeKobo != nil && (*in.DeliveryFeeKobo < 0 || *in.DeliveryFeeKobo > maxDeliveryFeeKobo) {
@@ -173,6 +177,16 @@ func (in *UpdateInput) normalize() *apierror.Error {
 		if utf8.RuneCountInString(*in.WhatsAppMessage) > 300 {
 			return validation("whatsapp_message must be at most 300 characters")
 		}
+	}
+	if in.NotificationEmail != nil {
+		addr := strings.TrimSpace(*in.NotificationEmail)
+		if addr != "" {
+			parsed, err := mail.ParseAddress(addr)
+			if err != nil || parsed.Address != addr || len(addr) > 254 {
+				return validation("notification_email must be a valid email address")
+			}
+		}
+		in.NotificationEmail = &addr
 	}
 	return nil
 }
