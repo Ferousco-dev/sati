@@ -368,7 +368,27 @@ This prevents payment status from being incorrectly inferred from the order stat
 | `PATCH /api/v1/admin/orders/:id/status` | Updates an order's preparation or fulfillment status.                |
 
 
-Customers cannot access another customer's order by changing an order ID in a request.
+Customers cannot access another customer's order by changing an order ID in a request. Another customer's order returns `404`, never `403`, so its existence is not revealed.
+
+Checkout request:
+
+```json
+{
+  "items": [{ "product_id": "...", "quantity": 2 }],
+  "fulfillment": { "type": "PICKUP" },
+  "payment_method": "ONLINE",
+  "notes": "optional"
+}
+```
+
+- `fulfillment.type` is `PICKUP` or `DELIVERY`. Delivery needs `address_id` and uses the flat `delivery_fee_kobo` from store settings until delivery zones exist.
+- `payment_method` is `ONLINE` or `PAY_ON_PICKUP`. `PAY_ON_PICKUP` is only allowed for pickup orders.
+- Sending any price or total is rejected. The same product on several lines is merged. An order holds up to 50 lines and 50 of each product.
+- Send an `Idempotency-Key` header to make retries safe. A repeated key returns the original order with `200` instead of creating another.
+- The order reference is `order_number`, like `SATI-10042`. The UUID `id` is used in URLs.
+- A customer can cancel only while the order is `PENDING`.
+- A saved delivery address is copied into the order, so editing or deleting the address never changes order history.
+- Money fields end in `_kobo` and are integers.
 
 ## Addresses
 
@@ -384,6 +404,17 @@ An address can contain:
 - Additional delivery instructions
 
 The backend validates that an address belongs to the authenticated customer before using it for an order.
+
+Address endpoints require a signed-in customer and only ever touch that customer's own addresses (up to 10):
+
+| Route                            | What it does                  |
+| -------------------------------- | ----------------------------- |
+| `GET /api/v1/addresses`          | Lists saved addresses.        |
+| `POST /api/v1/addresses`         | Saves an address.             |
+| `PATCH /api/v1/addresses/:id`    | Updates a saved address.      |
+| `DELETE /api/v1/addresses/:id`   | Deletes a saved address.      |
+
+Store settings are managed by the admin API: `GET /api/v1/admin/settings` (STAFF and ADMIN) and `PATCH /api/v1/admin/settings` (ADMIN) for `delivery_fee_kobo`.
 
 ## Delivery and pickup
 

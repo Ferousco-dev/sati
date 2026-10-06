@@ -44,9 +44,10 @@ func (h *Handler) RequireAuth() middleware.Middleware {
 }
 
 type Access struct {
-	Staff middleware.Middleware
-	Admin middleware.Middleware
-	Rider middleware.Middleware
+	Customer middleware.Middleware
+	Staff    middleware.Middleware
+	Admin    middleware.Middleware
+	Rider    middleware.Middleware
 }
 
 func (h *Handler) Access() Access {
@@ -56,9 +57,10 @@ func (h *Handler) Access() Access {
 		return func(next http.Handler) http.Handler { return authn(role(next)) }
 	}
 	return Access{
-		Staff: with(users.RoleAdmin, users.RoleStaff),
-		Admin: with(users.RoleAdmin),
-		Rider: with(users.RoleRider),
+		Customer: authn,
+		Staff:    with(users.RoleAdmin, users.RoleStaff),
+		Admin:    with(users.RoleAdmin),
+		Rider:    with(users.RoleRider),
 	}
 }
 

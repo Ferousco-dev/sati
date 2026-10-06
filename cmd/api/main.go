@@ -10,14 +10,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
 	"github.com/Ferousco-dev/sati/backend/internal/server"
+	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
 	"github.com/Ferousco-dev/sati/backend/pkg/logger"
@@ -65,6 +68,9 @@ func run() error {
 		Categories: categories.NewHandler(categorySvc, log),
 		Products:   products.NewHandler(productSvc, log),
 		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
+		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
+		Orders:     orders.NewHandler(orders.NewService(pool), log),
+		Store:      store.NewHandler(pool, log),
 		LocalFiles: storage.Handler(),
 	}
 

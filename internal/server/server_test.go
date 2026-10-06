@@ -9,11 +9,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
+	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 )
 
@@ -30,6 +33,9 @@ func newTestServer(pingErr error) http.Handler {
 		Categories: categories.NewHandler(nil, log),
 		Products:   products.NewHandler(nil, log),
 		Admin:      admin.NewHandler(nil, log),
+		Addresses:  addresses.NewHandler(nil, log),
+		Orders:     orders.NewHandler(nil, log),
+		Store:      store.NewHandler(nil, log),
 	}
 	return New(cfg, log, handlers)
 }

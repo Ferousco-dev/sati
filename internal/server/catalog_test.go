@@ -19,12 +19,15 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"github.com/Ferousco-dev/sati/backend/db"
+	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
+	"github.com/Ferousco-dev/sati/backend/internal/orders"
 	"github.com/Ferousco-dev/sati/backend/internal/products"
+	"github.com/Ferousco-dev/sati/backend/internal/store"
 	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
@@ -73,6 +76,9 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories CASCADE`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0`); err != nil {
+		t.Fatal(err)
+	}
 
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	storage, err := files.NewLocalStorage(t.TempDir(), "")
@@ -88,6 +94,9 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Categories: categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),
 		Products:   products.NewHandler(products.NewService(pool, storage, log), log),
 		Admin:      admin.NewHandler(admin.NewService(pool, authSvc), log),
+		Addresses:  addresses.NewHandler(addresses.NewService(pool), log),
+		Orders:     orders.NewHandler(orders.NewService(pool), log),
+		Store:      store.NewHandler(pool, log),
 		LocalFiles: storage.Handler(),
 	}
 	cfg := config.Config{CORSAllowedOrigins: []string{"http://localhost:3000"}}
@@ -103,7 +112,19 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	}
 }
 
+type httptestRecorder = httptest.ResponseRecorder
+
+func errorCodeOf(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	return decode[struct{ Error struct{ Code string } }](t, rec).Error.Code
+}
+
 func (e *catalogEnv) do(t *testing.T, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	return e.doWithHeader(t, method, path, body, cookie, "", "")
+}
+
+func (e *catalogEnv) doWithHeader(t *testing.T, method, path string, body any, cookie *http.Cookie, header, value string) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
@@ -112,6 +133,9 @@ func (e *catalogEnv) do(t *testing.T, method, path string, body any, cookie *htt
 	req := httptest.NewRequest(method, path, &buf)
 	if cookie != nil {
 		req.AddCookie(cookie)
+	}
+	if header != "" {
+		req.Header.Set(header, value)
 	}
 	rec := httptest.NewRecorder()
 	e.srv.ServeHTTP(rec, req)
