@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 // @ts-ignore: CSS module import for side effects
 import "./navbar.css";
 
 const links = [
-  { label: "Our Brand", href: "#brand" },
-  { label: "Stores", href: "#stores" },
-  { label: "Our Menu", href: "#menu" },
+  { label: "Our Brand", href: "/#brand" },
+  { label: "Stores", href: "/#stores" },
+  { label: "Our Menu", href: "/menu" },
   { label: "My Orders", href: "/account" },
 ];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { count, setCartOpen } = useStore();
+  const router = useRouter();
 
   return (
     <nav className="nav">
@@ -39,7 +41,7 @@ export default function Navbar() {
         <button
           type="button"
           className="nav__order"
-          onClick={() => setCartOpen(true)}
+          onClick={() => (count > 0 ? setCartOpen(true) : router.push("/menu"))}
           data-magnetic
         >
           {count > 0 ? `Cart (${count})` : "Order Now"}

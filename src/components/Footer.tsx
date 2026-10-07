@@ -70,7 +70,7 @@ export default function Footer() {
           </nav>
         </div>
 
-        <a href="/order" className="footer__cta" data-magnetic>
+        <a href="/menu" className="footer__cta" data-magnetic>
           <span>Order Now</span>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

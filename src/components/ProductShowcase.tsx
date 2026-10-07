@@ -2,23 +2,33 @@
 
 import { useState } from "react";
 import { useReveal } from "@/lib/useReveal";
+import { useStore } from "@/lib/store";
+import { MENU_ITEMS } from "@/lib/menu";
 // @ts-ignore: CSS module import for side effects
 import "./product-showcase.css";
 
+// Each card adds its menu item to the bag.
 const products = [
-  { name: "Beast Fuel", image: "/images/products/beast-fuel.webp" },
-  { name: "Chicken", image: "/images/products/chicken.webp" },
-  { name: "Shawarma", image: "/images/products/shawarma.webp" },
+  { name: "Beast Fuel", image: "/images/products/beast-fuel.webp", menuId: "beast-fuel" },
+  { name: "Chicken", image: "/images/products/chicken.webp", menuId: "chicken-classic" },
+  { name: "Shawarma", image: "/images/products/shawarma.webp", menuId: "shawarma-double" },
   {
     name: "Chicken & Chips",
     image: "/images/products/yogurt-chicken-chips.webp",
+    menuId: "yogurt-chicken-chips",
   },
-  { name: "Cake", image: "/images/products/cake.webp" },
+  { name: "Cake", image: "/images/products/cake.webp", menuId: "cake-slice" },
 ];
 
 export default function ProductShowcase() {
   const [active, setActive] = useState(2);
+  const { add } = useStore();
   useReveal();
+
+  const order = (menuId: string) => {
+    const item = MENU_ITEMS.find((i) => i.id === menuId);
+    if (item) add(item);
+  };
 
   return (
     <section className="showcase" id="brand">
@@ -54,10 +64,11 @@ export default function ProductShowcase() {
                 loading="lazy"
               />
 
-              <a
-                href="#order"
+              <button
+                type="button"
                 className="card__tag"
                 aria-label={`Order ${product.name}`}
+                onClick={() => order(product.menuId)}
               >
                 <span>Order Now</span>
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -69,13 +80,13 @@ export default function ProductShowcase() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </a>
+              </button>
             </div>
           </article>
         ))}
       </div>
 
-      <a href="#order" className="showcase__marquee" aria-label="Order now">
+      <a href="/menu" className="showcase__marquee" aria-label="Order now">
         <div className="showcase__marquee-track">
           {Array.from({ length: 8 }).map((_, i) => (
             <span key={i} className="showcase__marquee-item">

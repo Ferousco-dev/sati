@@ -122,6 +122,9 @@
 }
 
 .card__tag {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
   position: absolute;
   inset: 0 -1rem auto auto;
   z-index: 13;
