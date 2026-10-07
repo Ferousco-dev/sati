@@ -52,15 +52,16 @@ type Access struct {
 
 func (h *Handler) Access() Access {
 	authn := h.RequireAuth()
-	with := func(roles ...users.Role) middleware.Middleware {
+	// Staff, admin and rider requests that change something are written to the audit log.
+	audited := func(roles ...users.Role) middleware.Middleware {
 		role := RequireRole(roles...)
-		return func(next http.Handler) http.Handler { return authn(role(next)) }
+		return func(next http.Handler) http.Handler { return authn(role(h.auditChanges(next))) }
 	}
 	return Access{
 		Customer: authn,
-		Staff:    with(users.RoleAdmin, users.RoleStaff),
-		Admin:    with(users.RoleAdmin),
-		Rider:    with(users.RoleRider),
+		Staff:    audited(users.RoleAdmin, users.RoleStaff),
+		Admin:    audited(users.RoleAdmin),
+		Rider:    audited(users.RoleRider),
 	}
 }
 

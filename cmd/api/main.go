@@ -18,6 +18,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
+	"github.com/Ferousco-dev/sati/backend/internal/audit"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
@@ -66,6 +67,7 @@ func run() error {
 
 	notifier := notifications.NewService(cfg.FrontendURL, log)
 	mailer := notifications.NewMailer(notifier, pool)
+	recorder := audit.NewRecorder(pool, log)
 	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
 
 	storage, err := files.NewLocalStorage(cfg.UploadDir, cfg.AssetBaseURL)
@@ -104,7 +106,7 @@ func run() error {
 		Limiter:       limiter,
 		MetricsToken:  cfg.MetricsToken,
 		Health:        health.New(pool),
-		Auth:          auth.NewHandler(authSvc, log, cfg.IsProduction()),
+		Auth:          auth.NewHandler(authSvc, log, cfg.IsProduction()).WithAuditor(recorder),
 		Categories:    categories.NewHandler(categorySvc, log),
 		Products:      products.NewHandler(productSvc, log),
 		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),

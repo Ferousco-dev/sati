@@ -25,6 +25,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
+	"github.com/Ferousco-dev/sati/backend/internal/audit"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
@@ -85,7 +86,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs, payment_events CASCADE`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs, payment_events, audit_logs CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
@@ -116,7 +117,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Limiter:       ratelimit.NewMemory(),
 		MetricsToken:  "metrics-secret",
 		Health:        health.New(pool),
-		Auth:          auth.NewHandler(authSvc, log, false),
+		Auth:          auth.NewHandler(authSvc, log, false).WithAuditor(audit.NewRecorder(pool, log)),
 		Categories:    categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),
 		Products:      products.NewHandler(products.NewService(pool, storage, log), log),
 		Admin:         admin.NewHandler(admin.NewService(pool, authSvc), log),

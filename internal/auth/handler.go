@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ferousco-dev/sati/backend/internal/audit"
+	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
@@ -28,6 +30,13 @@ type Handler struct {
 	log          *slog.Logger
 	secureCookie bool
 	limiter      ratelimit.Limiter
+	auditor      *audit.Recorder
+}
+
+// WithAuditor records administrative requests and sign-in events.
+func (h *Handler) WithAuditor(a *audit.Recorder) *Handler {
+	h.auditor = a
+	return h
 }
 
 // WithLimiter also limits logins per account, so one password cannot be
@@ -97,9 +106,15 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, issued, err := h.svc.Login(r.Context(), LoginInput(body))
+	if errors.Is(err, ErrInvalidCredentials) {
+		h.recordLogin(r, "auth.login_failed", "", "", map[string]any{"email": strings.ToLower(strings.TrimSpace(body.Email))})
+	}
 	if err != nil {
 		h.fail(w, r, err)
 		return
+	}
+	if user.Role != users.RoleCustomer {
+		h.recordLogin(r, "auth.login", user.ID, string(user.Role), nil)
 	}
 	h.setCookie(w, issued.Token, issued.ExpiresAt)
 	apierror.JSON(w, http.StatusOK, map[string]any{"user": user})

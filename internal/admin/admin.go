@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Ferousco-dev/sati/backend/internal/audit"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
@@ -155,13 +156,17 @@ func (s *Service) ListCustomers(ctx context.Context, query string, limit, offset
 }
 
 type Handler struct {
-	svc *Service
-	log *slog.Logger
+	svc   *Service
+	log   *slog.Logger
+	audit *audit.Repository
 }
 
-func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
+func NewHandler(svc *Service, log *slog.Logger) *Handler {
+	return &Handler{svc: svc, log: log, audit: audit.NewRepository()}
+}
 
 func (h *Handler) Mount(mux router.Mux, access auth.Access) {
+	mux.Handle("GET /api/v1/admin/audit-logs", access.Admin(http.HandlerFunc(h.auditLogs)))
 	mux.Handle("GET /api/v1/admin/riders", access.Staff(http.HandlerFunc(h.riders)))
 	mux.Handle("GET /api/v1/admin/customers", access.Admin(http.HandlerFunc(h.customers)))
 	mux.Handle("GET /api/v1/admin/users", access.Admin(http.HandlerFunc(h.list)))
@@ -187,6 +192,36 @@ func (h *Handler) customers(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := h.svc.ListCustomers(r.Context(), r.URL.Query().Get("q"), limit, offset)
 	h.respond(w, r, http.StatusOK, page, err)
+}
+
+func (h *Handler) auditLogs(w http.ResponseWriter, r *http.Request) {
+	limit, offset, perr := httpx.Pagination(r)
+	if perr != nil {
+		apierror.Write(w, perr)
+		return
+	}
+	q := r.URL.Query()
+	f := audit.Filter{
+		ActorID: q.Get("actor_id"), Action: strings.TrimSpace(q.Get("action")),
+		EntityType: q.Get("entity_type"), EntityID: q.Get("entity_id"), Limit: limit, Offset: offset,
+	}
+	if f.ActorID != "" && !httpx.ValidUUID(f.ActorID) {
+		apierror.Write(w, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", "actor_id is not a valid id"))
+		return
+	}
+	for name, dst := range map[string]**time.Time{"from": &f.From, "to": &f.To} {
+		if raw := q.Get(name); raw != "" {
+			t, err := time.Parse(time.RFC3339, raw)
+			if err != nil {
+				apierror.Write(w, apierror.New(http.StatusBadRequest, "VALIDATION_ERROR", name+" must be an RFC 3339 timestamp"))
+				return
+			}
+			*dst = &t
+		}
+	}
+
+	records, total, err := h.audit.List(r.Context(), h.svc.pool, f)
+	h.respond(w, r, http.StatusOK, map[string]any{"audit_logs": records, "total": total, "limit": limit, "offset": offset}, err)
 }
 
 func (h *Handler) riders(w http.ResponseWriter, r *http.Request) {
