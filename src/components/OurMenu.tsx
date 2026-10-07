@@ -63,18 +63,18 @@ export default function OurMenu() {
           </div>
         </div>
         <p className="menu__script">
-          Fuel for the
+          Sweet treats
           <br />
-          campus grind
+          &amp; healthy sips
         </p>
       </div>
 
       <div className="menu__grid">
         <div className="menu__intro" data-reveal>
           <h3 className="menu__intro-title">
-            Stacked <span className="menu__amp">&amp;</span> loaded
+            Fresh <span className="menu__amp">&amp;</span> sweet
             <br />
-            for the late shift
+            for every occasion
           </h3>
           <a href="/menu" className="button menu__button" data-magnetic>
             <span className="button__text">See the full menu</span>

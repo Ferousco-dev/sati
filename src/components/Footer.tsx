@@ -5,15 +5,15 @@ const columns = [
   {
     title: "Menu",
     links: [
-      { label: "Burgers", href: "/menu#burgers" },
-      { label: "Shawarma", href: "/menu#shawarma" },
-      { label: "Chicken", href: "/menu#chicken" },
-      { label: "Pizza", href: "/menu#pizza" },
-      { label: "Cake & Sides", href: "/menu#cake" },
+      { label: "Parfait", href: "/menu#parfait" },
+      { label: "Desserts & Cakes", href: "/menu#cakes" },
+      { label: "Small Chops", href: "/menu#small-chops" },
+      { label: "Yoghurt", href: "/menu#yoghurt" },
+      { label: "Healthy Drinks", href: "/menu#drinks" },
     ],
   },
   {
-    title: "SATI-L Yoghurt & confectionery ",
+    title: "SATI-L",
     links: [
       { label: "Our Story", href: "/brand" },
       { label: "Find a Spot", href: "/stores" },
@@ -24,7 +24,7 @@ const columns = [
   {
     title: "Visit",
     links: [
-      { label: "Campus Plaza, Block B", href: "/stores" },
+      { label: "Visit our store", href: "/stores" },
       { label: "Open 9am – 11pm daily", href: "/stores" },
       {
         label: "hello@orentegrills.com",
@@ -44,10 +44,10 @@ export default function Footer() {
           <div className="footer__brand">
             <img
               src="/images/logo.png"
-              alt="SATI-L Yoghurt & confectionery "
+              alt="SATI-L Yoghurt & Confectionery"
               className="footer__logo"
             />
-            <p className="footer__tagline">Make you ask for more </p>
+            <p className="footer__tagline">Make you ask for more</p>
           </div>
 
           <nav className="footer__cols" aria-label="Footer">

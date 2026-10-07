@@ -7,9 +7,9 @@ import { StoreProvider } from "@/lib/store";
 import CartDrawer from "@/components/CartDrawer";
 
 export const metadata: Metadata = {
-  title: "SATI-L Yoghurt & confectionery  — Burgers, Shawarma, Hot Dogs & More",
+  title: "SATI-L Yoghurt & Confectionery — Parfait, Cakes, Small Chops & More",
   description:
-    "SATI-L Yoghurt & confectionery  is your campus spot for gourmet burgers, shawarma, hot dogs, sausages and more. Every taste, an adventure. Order now.",
+    "SATI-L Yoghurt & Confectionery makes parfait, desserts, cakes, small chops, yoghurt and healthy drinks, with outdoor catering and events (zobo and cocktails). Make you ask for more. Order now.",
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Permanent+Marker&display=swap"
           rel="stylesheet"
         />
       </head>

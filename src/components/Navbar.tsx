@@ -19,8 +19,8 @@ export default function Navbar() {
   return (
     <nav className="nav">
       <div className="nav__container">
-        <a href="/" className="nav__logo" aria-label="SATI-L Yoghurt & confectionery  home">
-          <img src="/images/logo.png" alt="SATI-L Yoghurt & confectionery " />
+        <a href="/" className="nav__logo" aria-label="SATI-L Yoghurt & Confectionery home">
+          <img src="/images/logo.png" alt="SATI-L Yoghurt & Confectionery" />
         </a>
 
         <div className={`nav__menu ${open ? "is-open" : ""}`}>

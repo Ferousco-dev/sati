@@ -43,11 +43,8 @@ const arrow = (
   </span>
 );
 
-const locations = [
-  { image: "/images/locations/loc-1.webp", label: "Right on campus" },
-  { image: "/images/locations/loc-2.webp", label: "Open late" },
-  { image: "/images/locations/loc-3.webp", label: "Fuel up" },
-];
+// Paste the Google Maps embed link here (Share > Embed a map > copy the src="...").
+const MAP_EMBED_URL = "";
 
 export default function Catering() {
   useReveal();
@@ -66,9 +63,9 @@ export default function Catering() {
             data-parallax="-12"
           />
           <p className="catering__banner-note">
-            Feed the mates
+            Make them
             <br />
-            to the masses
+            ask for more
           </p>
         </div>
 
@@ -79,44 +76,31 @@ export default function Catering() {
           </h2>
           <div className="catering__right">
             <p className="catering__text">
-              From study-week all-nighters to club socials and faculty events,
-              our catering is built to feed any hungry crowd.
+              From weddings and birthdays to cocktail evenings and outdoor
+              events, our small chops, parfait, cakes, zobo and cocktails are
+              made to feed any crowd.
             </p>
-            <a href="#catering" className="button is-light" data-magnetic>
+            {/* <a href="#catering" className="button is-light" data-magnetic>
               <span className="button__text">Learn more</span>
               {arrow}
               <span className="button__inner" />
-            </a>
+            </a> */}
           </div>
         </div>
 
         <div className="catering__gallery">
-          <figure className="gallery-card is-tall" data-reveal>
-            <div className="gallery-card__img-wrap">
-              <img src={locations[0].image} alt="" loading="lazy" />
-            </div>
-            <figcaption className="gallery-card__label">
-              {locations[0].label}
-            </figcaption>
-          </figure>
-
-          <div className="gallery-col" data-reveal>
-            <figure className="gallery-card">
-              <div className="gallery-card__img-wrap">
-                <img src={locations[1].image} alt="" loading="lazy" />
-              </div>
-              <figcaption className="gallery-card__label">
-                {locations[1].label}
-              </figcaption>
-            </figure>
-            <figure className="gallery-card">
-              <div className="gallery-card__img-wrap">
-                <img src={locations[2].image} alt="" loading="lazy" />
-              </div>
-              <figcaption className="gallery-card__label">
-                {locations[2].label}
-              </figcaption>
-            </figure>
+          <div className="gallery-map" data-reveal>
+            {MAP_EMBED_URL ? (
+              <iframe
+                src={MAP_EMBED_URL}
+                title="Map to our store"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            ) : (
+              <div className="gallery-map__empty">Map coming soon</div>
+            )}
           </div>
 
           <div className="gallery-card is-find" data-reveal>

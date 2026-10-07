@@ -15,7 +15,7 @@ export const STAGES: OrderStage[] = [
   {
     key: "preparing",
     label: "Preparing",
-    caption: "On the grill now",
+    caption: "Being prepared fresh",
     at: 0.25,
   },
   {

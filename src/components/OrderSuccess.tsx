@@ -106,8 +106,8 @@ export default function OrderSuccess({ order, name }: Props) {
 
       <h1 className="os-title os-reveal">Order placed!</h1>
       <p className="os-sub os-reveal">
-        Thanks{name ? `, ${name.split(" ")[0]}` : ""}  your food is on the
-        grill. We&apos;ll have it ready soon.
+        Thanks{name ? `, ${name.split(" ")[0]}` : ""}. Your order is being
+        prepared fresh. We&apos;ll have it ready soon.
       </p>
 
       <div className="os-receipt os-reveal">

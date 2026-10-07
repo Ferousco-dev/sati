@@ -56,17 +56,17 @@ export default function Hero() {
 
   const overlay = (
     <>
-      <div className="hero__subtitle">Campus fresh.</div>
+      <div className="hero__subtitle">Make you ask for more.</div>
 
       <h1 className="hero__title">
         <span className="hero__title-mask">
           <span className="hero__title-line">
-            Burgers, Shawarma<span className="hero__comma">,</span>
+            Parfait, Cakes<span className="hero__comma">,</span>
           </span>
         </span>
         <span className="hero__title-mask">
           <span className="hero__title-line">
-            Made for the late-night grind.
+            Small chops, yoghurt &amp; more.
           </span>
         </span>
       </h1>
