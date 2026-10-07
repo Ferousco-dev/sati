@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"time"
@@ -143,7 +144,7 @@ type Handler struct {
 
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/dashboard", access.Staff(http.HandlerFunc(h.dashboard)))
 }
 

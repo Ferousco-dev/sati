@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -117,6 +118,7 @@ func (s *Service) Create(ctx context.Context, customerID string, in CreateInput,
 		return Order{}, false, err
 	}
 
+	metrics.OrdersPlaced.Inc(string(in.PaymentMethod), string(in.Fulfillment.Type))
 	order, err := s.Get(ctx, customerID, orderID)
 	return order, true, err
 }

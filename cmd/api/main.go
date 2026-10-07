@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
+	"github.com/Ferousco-dev/sati/backend/pkg/ratelimit"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -53,6 +58,12 @@ func run() error {
 	}
 	defer pool.Close()
 
+	limiter, redisClient := newLimiter(ctx, cfg, log)
+	if redisClient != nil {
+		defer redisClient.Close()
+	}
+	registerGauges(pool)
+
 	notifier := notifications.NewService(cfg.FrontendURL, log)
 	mailer := notifications.NewMailer(notifier, pool)
 	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
@@ -85,7 +96,13 @@ func run() error {
 	if paymentSvc != nil {
 		paymentsHandler.WithService(paymentSvc)
 	}
+	healthHandler := health.New(pool)
+	if redisClient != nil {
+		healthHandler.WithRedis(redisPinger{redisClient})
+	}
 	handlers := server.Handlers{
+		Limiter:       limiter,
+		MetricsToken:  cfg.MetricsToken,
 		Health:        health.New(pool),
 		Auth:          auth.NewHandler(authSvc, log, cfg.IsProduction()),
 		Categories:    categories.NewHandler(categorySvc, log),
@@ -149,3 +166,61 @@ func run() error {
 	}
 	return nil
 }
+
+// newLimiter shares rate-limit counters through Redis when it is configured and
+// otherwise counts in memory. If Redis is down requests are allowed, not blocked.
+func newLimiter(ctx context.Context, cfg config.Config, log *slog.Logger) (ratelimit.Limiter, *redis.Client) {
+	if cfg.RedisURL == "" {
+		log.Info("REDIS_URL is not set, rate limits are counted in memory")
+		return ratelimit.NewMemory(), nil
+	}
+	opts, err := redis.ParseURL(cfg.RedisURL)
+	if err != nil {
+		log.Error("REDIS_URL is not valid, rate limits are counted in memory", "error", err)
+		return ratelimit.NewMemory(), nil
+	}
+	client := redis.NewClient(opts)
+
+	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx).Err(); err != nil {
+		log.Warn("Redis is not reachable, rate limiting will allow requests until it is", "error", err)
+	}
+	return ratelimit.NewRedis(client, "sati:"), client
+}
+
+// registerGauges publishes queue sizes, which are read from the database on every scrape.
+func registerGauges(pool *pgxpool.Pool) {
+	collect := func(query string) func(context.Context) ([]metrics.Sample, error) {
+		return func(ctx context.Context) ([]metrics.Sample, error) {
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+			rows, err := pool.Query(ctx, query)
+			if err != nil {
+				return nil, err
+			}
+			defer rows.Close()
+
+			var out []metrics.Sample
+			for rows.Next() {
+				var label string
+				var n float64
+				if err := rows.Scan(&label, &n); err != nil {
+					return nil, err
+				}
+				out = append(out, metrics.Sample{Labels: []string{label}, Value: n})
+			}
+			return out, rows.Err()
+		}
+	}
+	metrics.Default.GaugeFunc("sati_email_jobs", "Queued emails by status.", []string{"status"},
+		collect(`SELECT status::text, count(*) FROM email_jobs GROUP BY status`))
+	metrics.Default.GaugeFunc("sati_open_orders", "Orders still being worked, by status.", []string{"status"},
+		collect(`SELECT status::text, count(*) FROM orders WHERE status IN ('PENDING','CONFIRMED','PREPARING','READY','OUT_FOR_DELIVERY') GROUP BY status`))
+	metrics.Default.GaugeFunc("sati_payments_needing_refund", "Payments waiting for a refund.", []string{"provider"},
+		collect(`SELECT provider, count(*) FROM payments WHERE needs_refund GROUP BY provider`))
+}
+
+type redisPinger struct{ client *redis.Client }
+
+func (p redisPinger) Ping(ctx context.Context) error { return p.client.Ping(ctx).Err() }

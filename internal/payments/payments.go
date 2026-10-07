@@ -3,6 +3,7 @@ package payments
 import (
 	"context"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -174,7 +175,7 @@ func (h *Handler) WithService(svc Service) *Handler {
 	return h
 }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/payments", access.Staff(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/v1/admin/payments/{id}/refunded", access.Admin(http.HandlerFunc(h.refunded)))
 

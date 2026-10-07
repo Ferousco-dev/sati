@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"net/mail"
@@ -106,7 +107,7 @@ func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
 	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now}
 }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/settings", access.Staff(http.HandlerFunc(h.get)))
 	mux.Handle("PATCH /api/v1/admin/settings", access.Admin(http.HandlerFunc(h.update)))
 }

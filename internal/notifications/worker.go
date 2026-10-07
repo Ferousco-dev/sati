@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"context"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
 	"log/slog"
 	"time"
 
@@ -78,15 +79,18 @@ func (w *Worker) process(ctx context.Context, job Job) {
 
 	switch {
 	case err == nil:
+		metrics.Emails.Inc("sent")
 		if err := w.repo.MarkSent(ctx, w.pool, job.ID, now); err != nil {
 			w.log.Error("mark email sent", "job_id", job.ID, "error", err)
 		}
 	case email.IsPermanent(err) || job.Attempts >= job.MaxAttempts:
+		metrics.Emails.Inc("failed")
 		w.log.Error("email failed for good", "job_id", job.ID, "kind", job.Kind, "attempts", job.Attempts, "error", err)
 		if err := w.repo.MarkFailed(ctx, w.pool, job.ID, err.Error(), now); err != nil {
 			w.log.Error("mark email failed", "job_id", job.ID, "error", err)
 		}
 	default:
+		metrics.Emails.Inc("retry")
 		w.log.Warn("email will be retried", "job_id", job.ID, "kind", job.Kind, "attempts", job.Attempts, "error", err)
 		if err := w.repo.Retry(ctx, w.pool, job.ID, err.Error(), now.Add(backoff(job.Attempts))); err != nil {
 			w.log.Error("schedule email retry", "job_id", job.ID, "error", err)

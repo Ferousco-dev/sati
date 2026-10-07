@@ -38,6 +38,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/config"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
+	"github.com/Ferousco-dev/sati/backend/pkg/ratelimit"
 )
 
 type captureMailer struct{ invites map[string]string }
@@ -112,6 +113,8 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	handlers := Handlers{
+		Limiter:       ratelimit.NewMemory(),
+		MetricsToken:  "metrics-secret",
 		Health:        health.New(pool),
 		Auth:          auth.NewHandler(authSvc, log, false),
 		Categories:    categories.NewHandler(categories.NewService(categories.NewRepository(pool)), log),

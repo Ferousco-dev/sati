@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
 	"net/http"
 	"strings"
 	"time"
@@ -223,6 +224,9 @@ func (s *Service) HandleWebhook(ctx context.Context, signature string, body []by
 	}
 	event, err := s.provider.ParseWebhook(signature, body)
 	if err != nil {
+		if errors.Is(err, payments.ErrInvalidSignature) {
+			metrics.Webhooks.Inc(s.provider.Name(), "invalid_signature")
+		}
 		return err
 	}
 
@@ -232,6 +236,7 @@ func (s *Service) HandleWebhook(ctx context.Context, signature string, body []by
 	}
 
 	if event.Type != payments.EventChargeSuccess || event.Reference == "" {
+		metrics.Webhooks.Inc(name, "ignored")
 		_, err := record(s.pool)
 		return err
 	}
@@ -246,13 +251,23 @@ func (s *Service) HandleWebhook(ctx context.Context, signature string, body []by
 	if err != nil {
 		return err
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		fresh, err := record(tx)
-		if err != nil || !fresh {
+		if err != nil {
 			return err
+		}
+		if !fresh {
+			metrics.Webhooks.Inc(name, "duplicate")
+			return nil
 		}
 		return s.applyVerification(ctx, tx, event.Reference, verification)
 	})
+	if err != nil {
+		metrics.Webhooks.Inc(name, "error")
+		return err
+	}
+	metrics.Webhooks.Inc(name, "processed")
+	return nil
 }
 
 // applyVerification is the single place a payment result changes an order. It is
@@ -284,6 +299,7 @@ func (s *Service) applyVerification(ctx context.Context, tx pgx.Tx, reference st
 		}
 		if v.AmountKobo != p.AmountKobo || v.Currency != payments.Currency {
 			s.log("payment amount mismatch", "reference", reference, "expected", p.AmountKobo, "got", v.AmountKobo, "currency", v.Currency)
+			metrics.Payments.Inc(name, "amount_mismatch")
 			if err := s.payments.SetFailed(ctx, tx, p.ID, mismatchNote, true, now); err != nil {
 				return err
 			}
@@ -291,6 +307,7 @@ func (s *Service) applyVerification(ctx context.Context, tx pgx.Tx, reference st
 		}
 
 		if order.Status == StatusPending && order.PaymentStatus != "PAID" {
+			metrics.Payments.Inc(name, "paid")
 			if err := s.payments.SetPaid(ctx, tx, p.ID, v.TransactionID, v.GatewayResponse, false, now); err != nil {
 				return err
 			}
@@ -306,6 +323,7 @@ func (s *Service) applyVerification(ctx context.Context, tx pgx.Tx, reference st
 
 		// The money arrived but the order cannot use it: it was cancelled or expired,
 		// or another attempt already paid. Keep the record and flag it for a refund.
+		metrics.Payments.Inc(name, "paid_needs_refund")
 		if err := s.payments.SetPaid(ctx, tx, p.ID, v.TransactionID, v.GatewayResponse, true, now); err != nil {
 			return err
 		}
@@ -318,6 +336,7 @@ func (s *Service) applyVerification(ctx context.Context, tx pgx.Tx, reference st
 		if p.Status != "PENDING" {
 			return nil
 		}
+		metrics.Payments.Inc(name, "failed")
 		if err := s.payments.SetFailed(ctx, tx, p.ID, v.GatewayResponse, false, now); err != nil {
 			return err
 		}

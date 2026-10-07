@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -131,7 +132,7 @@ func NewZoneHandler(pool *pgxpool.Pool, log *slog.Logger) *ZoneHandler {
 	return &ZoneHandler{pool: pool, repo: NewZoneRepository(), log: log, now: time.Now}
 }
 
-func (h *ZoneHandler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *ZoneHandler) Mount(mux router.Mux, access auth.Access) {
 	cached := middleware.PublicCache(30*time.Second, time.Minute)
 	mux.Handle("GET /api/v1/delivery/zones", cached(http.HandlerFunc(h.listPublic)))
 

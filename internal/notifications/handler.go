@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"time"
@@ -25,7 +26,7 @@ func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
 	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now}
 }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/notifications", access.Customer(http.HandlerFunc(h.list)))
 	mux.Handle("GET /api/v1/notifications/unread-count", access.Customer(http.HandlerFunc(h.unreadCount)))
 	mux.Handle("POST /api/v1/notifications/read-all", access.Customer(http.HandlerFunc(h.readAll)))

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,7 +23,7 @@ type Handler struct {
 
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	cached := middleware.PublicCache(time.Minute, 5*time.Minute)
 
 	mux.Handle("GET /api/v1/products", cached(http.HandlerFunc(h.listPublic)))

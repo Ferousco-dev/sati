@@ -2,6 +2,7 @@ package addresses
 
 import (
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 
@@ -18,7 +19,7 @@ type Handler struct {
 
 func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/addresses", access.Customer(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/v1/addresses", access.Customer(http.HandlerFunc(h.create)))
 	mux.Handle("PATCH /api/v1/addresses/{id}", access.Customer(http.HandlerFunc(h.update)))

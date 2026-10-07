@@ -2,6 +2,7 @@ package orders
 
 import (
 	"context"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
 
 	"github.com/jackc/pgx/v5"
 
@@ -58,6 +59,7 @@ func (s *Service) eventFor(ctx context.Context, tx pgx.Tx, id, reason string) (n
 }
 
 func (s *Service) emitStatus(ctx context.Context, tx pgx.Tx, id string, status Status, reason string) {
+	metrics.OrderStatusChanges.Inc(string(status))
 	if e, ok := s.eventFor(ctx, tx, id, reason); ok {
 		s.notify.OrderStatus(ctx, tx, e, string(status))
 	}

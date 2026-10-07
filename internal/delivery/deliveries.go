@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -259,7 +260,7 @@ func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
 	return &Handler{pool: pool, repo: NewRepository(), log: log}
 }
 
-func (h *Handler) Mount(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/delivery", access.Staff(http.HandlerFunc(h.listAdmin)))
 	mux.Handle("GET /api/v1/rider/deliveries", access.Rider(http.HandlerFunc(h.listRider)))
 }

@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"net/http"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
 )
 
-func (h *Handler) MountStaff(mux *http.ServeMux, access auth.Access) {
+func (h *Handler) MountStaff(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/orders", access.Staff(http.HandlerFunc(h.staffList)))
 	mux.Handle("GET /api/v1/admin/orders/{id}", access.Staff(http.HandlerFunc(h.staffGet)))
 	mux.Handle("PATCH /api/v1/admin/orders/{id}/status", access.Staff(http.HandlerFunc(h.changeStatus)))

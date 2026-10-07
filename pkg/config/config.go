@@ -35,6 +35,7 @@ type Config struct {
 	R2PublicURL       string
 
 	PaymentExpiry      time.Duration
+	MetricsToken       string
 	FrontendURL        string
 	EmailWorkerEnabled bool
 	StoreTimezone      string
@@ -86,6 +87,7 @@ func Load() (Config, error) {
 		R2PublicURL:       os.Getenv("R2_PUBLIC_URL"),
 
 		PaymentExpiry:      expiry,
+		MetricsToken:       os.Getenv("METRICS_TOKEN"),
 		FrontendURL:        strings.TrimRight(getenv("FRONTEND_URL", "http://localhost:3000"), "/"),
 		EmailWorkerEnabled: getenv("EMAIL_WORKER_ENABLED", "true") != "false",
 		StoreTimezone:      getenv("STORE_TIMEZONE", "Africa/Lagos"),

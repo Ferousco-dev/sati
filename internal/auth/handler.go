@@ -2,28 +2,46 @@ package auth
 
 import (
 	"errors"
+	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/httpx"
+	"github.com/Ferousco-dev/sati/backend/pkg/metrics"
 	"github.com/Ferousco-dev/sati/backend/pkg/middleware"
+	"github.com/Ferousco-dev/sati/backend/pkg/ratelimit"
 )
 
-const CookieName = "sati_session"
+const (
+	CookieName              = "sati_session"
+	loginAttemptsPerAccount = 8
+	loginAttemptWindow      = 15 * time.Minute
+)
 
 type Handler struct {
 	svc          *Service
 	log          *slog.Logger
 	secureCookie bool
+	limiter      ratelimit.Limiter
+}
+
+// WithLimiter also limits logins per account, so one password cannot be
+// guessed from many addresses.
+func (h *Handler) WithLimiter(l ratelimit.Limiter) *Handler {
+	h.limiter = l
+	return h
 }
 
 func NewHandler(svc *Service, log *slog.Logger, secureCookie bool) *Handler {
 	return &Handler{svc: svc, log: log, secureCookie: secureCookie}
 }
 
-func (h *Handler) Mount(mux *http.ServeMux) {
+func (h *Handler) Mount(mux router.Mux) {
 	authn := h.RequireAuth()
 
 	mux.HandleFunc("POST /api/v1/auth/register", h.register)
@@ -66,6 +84,16 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if err := httpx.DecodeJSON(w, r, &body); err != nil {
 		apierror.Write(w, err)
 		return
+	}
+
+	if h.limiter != nil {
+		key := "rl:login-email:" + strings.ToLower(strings.TrimSpace(body.Email))
+		if res, err := h.limiter.Allow(r.Context(), key, loginAttemptsPerAccount, loginAttemptWindow); err == nil && !res.Allowed {
+			metrics.RateLimited.Inc("login-email")
+			w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(res.RetryAfter.Seconds()))))
+			apierror.Write(w, apierror.ErrRateLimited)
+			return
+		}
 	}
 
 	user, issued, err := h.svc.Login(r.Context(), LoginInput(body))
