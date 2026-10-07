@@ -25,7 +25,8 @@ const ITEM_CATEGORY: Record<string, string> = Object.fromEntries(
   MENU.flatMap((c) => c.items.map((item) => [item.id, c.id])),
 );
 
-export default function OurMenu() {
+// The link to the full menu is only for the landing page, the menu page already is the full menu.
+export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?: boolean }) {
   useReveal();
   const { add } = useStore();
   const [filter, setFilter] = useState("all");
@@ -76,21 +77,23 @@ export default function OurMenu() {
             <br />
             for every occasion
           </h3>
-          <a href="/menu" className="button menu__button" data-magnetic>
-            <span className="button__text">See the full menu</span>
-            <span className="button__icon">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M5 12h14M13 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="button__inner" />
-          </a>
+          {showFullMenuLink ? (
+            <a href="/menu" className="button menu__button" data-magnetic>
+              <span className="button__text">See the full menu</span>
+              <span className="button__icon">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M5 12h14M13 6l6 6-6 6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="button__inner" />
+            </a>
+          ) : null}
         </div>
 
         <div className="menu__col">

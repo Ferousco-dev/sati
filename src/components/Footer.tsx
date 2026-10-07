@@ -82,11 +82,6 @@ export default function Footer() {
             />
           </svg>
         </a>
-
-        <div className="footer__wordmark" aria-hidden="true">
-          SATI-L Yoghurt & confectionery 
-        </div>
-
         <div className="footer__bottom">
           <span>© {2026} SATI-L Yoghurt & confectionery . All rights reserved.</span>
           <div className="footer__socials">
@@ -106,6 +101,10 @@ export default function Footer() {
           </div>
         </div>
       </div>
+
+        <div className="footer__wordmark" aria-hidden="true">
+          SATI-L Yoghurt & confectionery 
+        </div>
     </footer>
   );
 }

@@ -6,7 +6,7 @@ export default function menu(){
   return(
     <>
     <Navbar />
-    <OurMenu />
+    <OurMenu showFullMenuLink={false} />
     <SiteFooter />
     </>
   )
