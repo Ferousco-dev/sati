@@ -164,7 +164,7 @@ func CORS(allowed []string) Middleware {
 
 			if r.Method == http.MethodOptions {
 				h.Set("Access-Control-Allow-Methods", strings.Join([]string{
-					http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions,
+					http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions,
 				}, ", "))
 				h.Set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
 				h.Set("Access-Control-Max-Age", "600")

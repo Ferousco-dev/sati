@@ -775,6 +775,46 @@ FAILED:    from PENDING or OUT_FOR_DELIVERY
 
 "Today" starts at midnight in the store timezone (`STORE_TIMEZONE`, default `Africa/Lagos`). Pass `?tz=Europe/London` with the viewer's own timezone, for example from `Intl.DateTimeFormat().resolvedOptions().timeZone` in the browser, to see their own day instead. All timestamps in the API are UTC, so the frontend shows them in the customer's local time.
 
+## Website content and picture library
+
+Admins change the website without code. The editable parts are fixed sections with fixed fields, so the design cannot be broken by an edit.
+
+| Section key | What it holds |
+| --- | --- |
+| `hero` | Tagline, title lines, button, slider pictures and a mobile picture. |
+| `how_it_works` | Heading and 2 to 6 steps. |
+| `testimonials` | Heading and up to 12 quotes with a 1 to 5 star rating and an optional picture. |
+| `gallery` | Heading, up to 12 pictures with captions, and an Instagram link. |
+| `faq` | Heading and up to 20 questions and answers. |
+| `catering` | Heading, text, banner picture and note, and a button. |
+| `footer` | Tagline, up to 4 link columns and a legal line. |
+| `announcement` | An optional bar at the top: on or off, text and link. |
+| `seo` | Page title, description and share picture. |
+| `layout` | The order of the landing page blocks and which ones are visible. |
+
+A section that nobody has published yet serves a built-in default, so the site works from day one. Testimonials, the gallery and the FAQ start empty. The frontend hides an empty section.
+
+**Drafts and publishing.** Saving writes a draft that visitors never see. `GET /admin/content/preview` shows every section with drafts applied. Publishing makes the draft the live version and keeps the old one. Rolling back publishes an earlier version again as a new version, so history is never rewritten. Rolling back to a version that uses a picture that was since deleted is refused.
+
+**Pictures** are uploaded once to the library (JPEG, PNG or WebP, up to 5MB) and then referenced by id. The public API replaces each reference with a ready-to-use `url`, `width`, `height` and `alt`. A picture that is in a draft or in live content cannot be deleted.
+
+**Rules on the content.** Every field has a length limit and unknown fields are refused. Links must be a path on the site, an anchor, or an `https`, `mailto` or `tel` link, so `javascript:` and similar are rejected.
+
+| Route | Who | What it does |
+| --- | --- | --- |
+| `GET /api/v1/content` | public | All live sections in one cached response. |
+| `GET /api/v1/admin/content` | ADMIN | Every section with its state. |
+| `GET /api/v1/admin/content/preview` | ADMIN | All sections with drafts applied. |
+| `GET /api/v1/admin/content/:key` | ADMIN | One section's live content and draft. |
+| `PUT /api/v1/admin/content/:key/draft` | ADMIN | Saves a draft, `{ "data": { ... } }`. |
+| `DELETE /api/v1/admin/content/:key/draft` | ADMIN | Throws the draft away. |
+| `POST /api/v1/admin/content/:key/publish` | ADMIN | Publishes the draft, with an optional `note`. |
+| `GET /api/v1/admin/content/:key/versions` | ADMIN | Version history. |
+| `POST /api/v1/admin/content/:key/rollback` | ADMIN | Publishes an earlier `version` again. |
+| `GET/POST /api/v1/admin/media`, `PATCH/DELETE /api/v1/admin/media/:id` | ADMIN | The picture library. |
+
+Every edit, publish and rollback is written to the audit log.
+
 ## Files and images
 
 Product and store images are stored outside PostgreSQL.

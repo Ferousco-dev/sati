@@ -13,6 +13,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/cms"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
@@ -38,6 +39,7 @@ type Handlers struct {
 	Addresses     *addresses.Handler
 	Orders        *orders.Handler
 	Store         *store.Handler
+	CMS           *cms.Handler
 	Payments      *payments.Handler
 	Analytics     *analytics.Handler
 	Notifications *notifications.Handler
@@ -95,6 +97,7 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) *App {
 	h.Zones.Mount(mux, access)
 	h.Deliveries.Mount(mux, access)
 	h.Store.Mount(mux, access)
+	h.CMS.Mount(mux, access)
 	if h.LocalFiles != nil {
 		mux.Handle("GET "+files.LocalURLPrefix, h.LocalFiles)
 	}

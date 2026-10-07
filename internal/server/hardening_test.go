@@ -18,6 +18,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/cms"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
 	"github.com/Ferousco-dev/sati/backend/internal/notifications"
@@ -51,6 +52,7 @@ func bareApp(ping error, limiter ratelimit.Limiter, metricsToken string, log *sl
 		Addresses:     addresses.NewHandler(nil, log),
 		Orders:        orders.NewHandler(nil, log),
 		Store:         store.NewHandler(nil, log),
+		CMS:           cms.NewHandler(nil, log),
 		Payments:      payments.NewHandler(nil, log),
 		Analytics:     analytics.NewHandler(nil, log),
 		Notifications: notifications.NewHandler(nil, log),

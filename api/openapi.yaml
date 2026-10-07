@@ -229,6 +229,173 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/content:
+    get:
+      tags: ["Website content admin"]
+      summary: "List every content section with its state."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/content/preview:
+    get:
+      tags: ["Website content admin"]
+      summary: "All sections with drafts applied, for previewing before publishing."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/content/{key}":
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Website content admin"]
+      summary: "One section with its published content and draft."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/content/{key}/draft":
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: ["Website content admin"]
+      summary: "Throw away a section's draft."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    put:
+      tags: ["Website content admin"]
+      summary: "Save a draft of a section. Visitors are not affected."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data: {description: "object, the section content"}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/content/{key}/publish":
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Website content admin"]
+      summary: "Publish the draft as a new live version."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/content/{key}/rollback":
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Website content admin"]
+      summary: "Publish an earlier version again as a new version."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: {type: integer}
+                note: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/content/{key}/versions":
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Website content admin"]
+      summary: "List a section's published versions."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
   /api/v1/admin/customers:
     get:
       tags: ["Admin"]
@@ -330,6 +497,85 @@ paths:
                 fee_kobo: {type: integer}
                 active: {type: boolean}
                 sort_order: {type: integer}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/media:
+    get:
+      tags: ["Media library"]
+      summary: "List uploaded pictures. Search with ?q=."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Media library"]
+      summary: "Upload a JPEG, PNG or WebP picture (max 5MB, multipart field file, optional alt)."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: {type: string, format: binary}
+                alt: {type: string}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/media/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: ["Media library"]
+      summary: "Delete a picture that no live content or draft uses."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: ["Media library"]
+      summary: "Change a picture's alt text."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alt_text: {type: string}
       responses:
         '200':
           description: Success.
@@ -971,6 +1217,16 @@ paths:
     get:
       tags: ["Orders"]
       summary: "Payment methods, delivery zones and fee for checkout. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/content:
+    get:
+      tags: ["Website content"]
+      summary: "All published website sections with pictures resolved to urls. Cached."
       x-access: public
       security: []
       responses:

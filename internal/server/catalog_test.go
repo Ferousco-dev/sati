@@ -29,6 +29,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/audit"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/cms"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/health"
@@ -87,7 +88,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs, payment_events, audit_logs CASCADE`); err != nil {
+	if _, err := pool.Exec(context.Background(), `TRUNCATE users, categories, delivery_zones, email_jobs, payment_events, audit_logs, content_sections, media CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
@@ -127,6 +128,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
 		Store:         store.NewHandler(pool, log).WithLocation(lagos),
+		CMS:           cms.NewHandler(cms.NewService(pool, storage, log), log),
 		Payments:      payments.NewHandler(pool, log).WithService(orderSvc),
 		Analytics:     analytics.NewHandler(analytics.NewService(pool, lagos), log),
 		Zones:         delivery.NewZoneHandler(pool, log),

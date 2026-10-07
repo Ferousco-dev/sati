@@ -22,6 +22,7 @@ import (
 	"github.com/Ferousco-dev/sati/backend/internal/audit"
 	"github.com/Ferousco-dev/sati/backend/internal/auth"
 	"github.com/Ferousco-dev/sati/backend/internal/categories"
+	"github.com/Ferousco-dev/sati/backend/internal/cms"
 	"github.com/Ferousco-dev/sati/backend/internal/delivery"
 	"github.com/Ferousco-dev/sati/backend/internal/email"
 	"github.com/Ferousco-dev/sati/backend/internal/files"
@@ -116,6 +117,7 @@ func run() error {
 		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
 		Store:         store.NewHandler(pool, log).WithLocation(storeLocation),
+		CMS:           cms.NewHandler(cms.NewService(pool, storage, log), log),
 		Payments:      payments.NewHandler(pool, log),
 		Analytics:     analytics.NewHandler(analytics.NewService(pool, storeLocation), log),
 		Zones:         delivery.NewZoneHandler(pool, log),

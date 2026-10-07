@@ -133,7 +133,7 @@ func TestEveryRouteEnforcesItsDocumentedAccess(t *testing.T) {
 		path := strings.NewReplacer("{id}", "00000000-0000-0000-0000-000000000000", "{imageId}", "00000000-0000-0000-0000-000000000001",
 			"{reference}", "SATI-0-NONE", "{path}", "none.png").Replace(r.path)
 		var body any
-		if r.method == "POST" || r.method == "PATCH" {
+		if r.method == "POST" || r.method == "PATCH" || r.method == "PUT" {
 			body = map[string]any{}
 		}
 		rec := e.do(t, r.method, path, body, cookies[who])
