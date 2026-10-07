@@ -5,6 +5,7 @@ import { useParallax } from "@/lib/useParallax";
 import { useSplitReveal } from "@/lib/useSplitReveal";
 // @ts-ignore: CSS module import for side effects
 import "./catering.css";
+import type { Catering as CateringContent, StoreInfo } from "@/lib/content/types";
 
 const wing = (
   <svg
@@ -43,10 +44,10 @@ const arrow = (
   </span>
 );
 
-// Paste the Google Maps embed link here (Share > Embed a map > copy the src="...").
-const MAP_EMBED_URL = "";
+export default function Catering({ content, store }: { content: CateringContent; store: StoreInfo }) {
+  // The map link is set by the admin in store settings.
+  const MAP_EMBED_URL = store.map_embed_url;
 
-export default function Catering() {
   useReveal();
   useParallax();
   useSplitReveal();
@@ -57,29 +58,21 @@ export default function Catering() {
         <div className="catering__banner" data-reveal>
           <img
             className="catering__banner-img"
-            src="/images/locations/catering.avif"
-            alt="Catering spread"
+            src={content.banner_image?.url ?? "/images/locations/catering.avif"}
+            alt={content.banner_image?.alt || "Catering spread"}
             loading="lazy"
             data-parallax="-12"
           />
-          <p className="catering__banner-note">
-            Make them
-            <br />
-            ask for more
-          </p>
+          {content.banner_note ? <p className="catering__banner-note">{content.banner_note}</p> : null}
         </div>
 
         <div className="catering__copy" data-reveal>
           <h2 className="catering__title">
             {wing}
-            <span>We&rsquo;ve got your catering covered</span>
+            <span>{content.heading}</span>
           </h2>
           <div className="catering__right">
-            <p className="catering__text">
-              From weddings and birthdays to cocktail evenings and outdoor
-              events, our small chops, parfait, cakes, zobo and cocktails are
-              made to feed any crowd.
-            </p>
+            <p className="catering__text">{content.text}</p>
             {/* <a href="#catering" className="button is-light" data-magnetic>
               <span className="button__text">Learn more</span>
               {arrow}

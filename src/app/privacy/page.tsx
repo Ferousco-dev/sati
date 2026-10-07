@@ -1,14 +1,11 @@
-"use client";
-
-import { useState } from "react";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import SiteFooter from "@/components/SiteFooter";
 
 export default function Privacy(){
   return(
     <>
     <Navbar />
-    <Footer />
+    <SiteFooter />
     </>
   )
 }

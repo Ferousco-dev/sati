@@ -9,7 +9,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "typecheck": "tsc --noEmit",
     "test:sw": "node --test scripts/sw.test.mjs",
-    "test:lib": "node --test src/lib/api/client.test.ts",
+    "test:lib": "node --test src/lib/api/client.test.ts src/lib/hours.test.ts src/lib/consent.test.ts",
     "test": "npm run typecheck && npm run test:lib && npm run test:sw"
   },
   "dependencies": {

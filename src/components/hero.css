@@ -113,10 +113,11 @@
 .hero__title {
   position: absolute;
   left: 2.5rem;
-  right: 2.5rem;
+  /* Leaves room for the View Menu button so the words never run under it. */
+  right: 15rem;
   bottom: 2.25rem;
   z-index: 3;
-  font-size: clamp(2.25rem, 5.5vw, 6.5rem);
+  font-size: clamp(2.25rem, 4.6vw, 5.75rem);
   font-weight: 900;
   line-height: 0.9;
   color: var(--white);

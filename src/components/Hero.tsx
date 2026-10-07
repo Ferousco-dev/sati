@@ -4,26 +4,32 @@ import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 // @ts-ignore: CSS module import for side effects
 import "./hero.css";
+import type { Hero as HeroContent } from "@/lib/content/types";
 
-const slides = [
+// Used until pictures are chosen for the hero in the admin.
+const fallbackSlides = [
   "/images/hero/slide-1.webp",
   "/images/hero/slide-2.webp",
   "/images/hero/slide-3.webp",
   "/images/hero/slide-4.webp",
 ];
 
-export default function Hero() {
+export default function Hero({ content }: { content: HeroContent }) {
+  const slides = content.images.length
+    ? content.images.map((i) => i.url).filter((u): u is string => Boolean(u))
+    : fallbackSlides;
+  const mobileImage = content.mobile_image?.url ?? "/images/hero-mobile.webp";
   const heroRef = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(true);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || slides.length < 2) return;
     const id = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length);
     }, 4500);
     return () => clearInterval(id);
-  }, [playing]);
+  }, [playing, slides.length]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -56,19 +62,14 @@ export default function Hero() {
 
   const overlay = (
     <>
-      <div className="hero__subtitle">Make you ask for more.</div>
+      {content.tagline ? <div className="hero__subtitle">{content.tagline}</div> : null}
 
       <h1 className="hero__title">
-        <span className="hero__title-mask">
-          <span className="hero__title-line">
-            Parfait, Cakes<span className="hero__comma">,</span>
+        {content.title_lines.map((line) => (
+          <span className="hero__title-mask" key={line}>
+            <span className="hero__title-line">{line}</span>
           </span>
-        </span>
-        <span className="hero__title-mask">
-          <span className="hero__title-line">
-            Small chops, yoghurt &amp; more.
-          </span>
-        </span>
+        ))}
       </h1>
     </>
   );
@@ -90,8 +91,8 @@ export default function Hero() {
         <div className="hero__texture" />
         {overlay}
 
-        <a href="#menu" className="button hero__cta" data-magnetic>
-          <span className="button__text">View Menu</span>
+        <a href={content.cta_url || "/menu"} className="button hero__cta" data-magnetic>
+          <span className="button__text">{content.cta_label || "View menu"}</span>
           <span className="button__icon">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -106,7 +107,7 @@ export default function Hero() {
           <span className="button__inner" />
         </a>
 
-        <div className="hero__dots">
+        <div className="hero__dots" hidden={slides.length < 2}>
           {slides.map((src, i) => (
             <button
               key={src}
@@ -121,6 +122,7 @@ export default function Hero() {
         <button
           type="button"
           className="hero__control"
+          hidden={slides.length < 2}
           aria-label={playing ? "Pause slideshow" : "Play slideshow"}
           onClick={() => setPlaying((v) => !v)}
         >
@@ -138,7 +140,7 @@ export default function Hero() {
       </div>
 
       <div className="hero__media is-mobile">
-        <img className="hero__image" src="/images/hero-mobile.webp" alt="" />
+        <img className="hero__image" src={mobileImage} alt="" />
         <div className="hero__shade" />
         <div className="hero__texture" />
         {overlay}

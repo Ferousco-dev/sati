@@ -8,15 +8,27 @@ import CartDrawer from "@/components/CartDrawer";
 import { ConsentProvider } from "@/lib/consent";
 import { PwaProvider } from "@/lib/pwa";
 import { ToastProvider } from "@/components/ui/Toast";
+import WhatsAppButton from "@/components/WhatsAppButton";
+import OrderFab from "@/components/OrderFab";
+import ConsentBar from "@/components/ConsentBar";
+import { getSiteContent, getStoreInfo } from "@/lib/content/server";
 
-export const metadata: Metadata = {
-  title: "SATI-L Yoghurt & Confectionery — Parfait, Cakes, Small Chops & More",
-  applicationName: "SATI-L",
-  appleWebApp: { capable: true, title: "SATI-L", statusBarStyle: "default" },
-  formatDetection: { telephone: false },
-  description:
-    "SATI-L Yoghurt & Confectionery makes parfait, desserts, cakes, small chops, yoghurt and healthy drinks, with outdoor catering and events (zobo and cocktails). Make you ask for more. Order now.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { seo } = await getSiteContent();
+  return {
+    title: seo.title,
+    description: seo.description,
+    applicationName: "SATI-L",
+    appleWebApp: { capable: true, title: "SATI-L", statusBarStyle: "default" },
+    formatDetection: { telephone: false },
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      type: "website",
+      images: seo.share_image?.url ? [{ url: seo.share_image.url }] : undefined,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#268adc",
@@ -25,11 +37,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const store = await getStoreInfo();
+
   return (
     <html lang="en">
       <head>
@@ -44,7 +58,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <ConsentProvider>
           <PwaProvider>
             <ToastProvider>
@@ -53,6 +67,9 @@ export default function RootLayout({
                 <Magnetic />
                 {children}
                 <CartDrawer />
+                <WhatsAppButton number={store.whatsapp_number} />
+                <OrderFab />
+                <ConsentBar />
               </StoreProvider>
             </ToastProvider>
           </PwaProvider>

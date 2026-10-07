@@ -147,6 +147,14 @@ NEXT_PUBLIC_API_URL=
 
 The API accepts requests from `http://localhost:3000` and `http://localhost:8000`, so use one of those addresses in development.
 
+## Landing page content
+
+The landing page keeps its original order: hero, product showcase, catering, menu, then testimonials and a gallery strip (both hidden until the admin adds some), and the footer. The hero, catering, testimonials, gallery, footer text, the top announcement bar and the page title come from the API (`GET /api/v1/content`), and the contact details, social links and map come from `GET /api/v1/store`. The pages refresh from the API every minute, and if the API is down they fall back to built-in defaults in `src/lib/content/defaults.ts`.
+
+The footer has a "Come by or order in" accordion with the opening hours (open or closed now, in the store's timezone), the delivery areas with their fees, and the address, phone, email, WhatsApp and directions.
+
+On a phone two floating buttons sit at the bottom right: WhatsApp, and under it a cart button that opens the cart, or the menu when the cart is empty. The WhatsApp button only appears once a WhatsApp number is set in the store settings.
+
 ## Installable app (PWA)
 
 The site can be installed on a phone or computer.
