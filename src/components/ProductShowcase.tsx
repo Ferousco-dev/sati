@@ -1,33 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useReveal } from "@/lib/useReveal";
+import { fallbackShowcase } from "@/lib/fallbacks";
+import type { Showcase as ShowcaseContent } from "@/lib/content/types";
 import { useStore } from "@/lib/store";
 import { MENU_ITEMS } from "@/lib/menu";
 // @ts-ignore: CSS module import for side effects
 import "./product-showcase.css";
+import Img from "@/components/ui/Img";
 
-// Each card adds its menu item to the bag.
-const products = [
-  { name: "Beast Fuel", image: "/images/products/beast-fuel.webp", menuId: "beast-fuel" },
-  { name: "Chicken", image: "/images/products/chicken.webp", menuId: "chicken-classic" },
-  { name: "Shawarma", image: "/images/products/shawarma.webp", menuId: "shawarma-double" },
-  {
-    name: "Chicken & Chips",
-    image: "/images/products/yogurt-chicken-chips.webp",
-    menuId: "yogurt-chicken-chips",
-  },
-  { name: "Cake", image: "/images/products/cake.webp", menuId: "cake-slice" },
-];
-
-export default function ProductShowcase() {
-  const [active, setActive] = useState(2);
+export default function ProductShowcase({ content }: { content: ShowcaseContent }) {
+  const products = content.items.length
+    ? content.items.map((i) => ({ name: i.name, image: i.image.url ?? "", productId: i.product_id }))
+    : fallbackShowcase.map((i) => ({ name: i.name, image: i.image, productId: i.product_id }));
+  const [active, setActive] = useState(Math.min(2, products.length - 1));
   const { add } = useStore();
+  const router = useRouter();
   useReveal();
 
-  const order = (menuId: string) => {
-    const item = MENU_ITEMS.find((i) => i.id === menuId);
+  // A card adds its product to the bag, or opens the menu when no product is linked.
+  const order = (productId: string) => {
+    const item = MENU_ITEMS.find((i) => i.id === productId);
     if (item) add(item);
+    else router.push("/menu");
   };
 
   return (
@@ -57,7 +54,7 @@ export default function ProductShowcase() {
                 ))}
               </div>
 
-              <img
+              <Img
                 className="card__img"
                 src={product.image}
                 alt={product.name}
@@ -68,9 +65,9 @@ export default function ProductShowcase() {
                 type="button"
                 className="card__tag"
                 aria-label={`Order ${product.name}`}
-                onClick={() => order(product.menuId)}
+                onClick={() => order(product.productId)}
               >
-                <span>Order Now</span>
+                <span>{content.order_label}</span>
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
                     d="M7.05 16.95 16.95 7.05M16.95 7.05H8.46M16.95 7.05v8.49"
@@ -86,11 +83,11 @@ export default function ProductShowcase() {
         ))}
       </div>
 
-      <a href="/menu" className="showcase__marquee" aria-label="Order now">
+      <a href={content.marquee_url || "/menu"} className="showcase__marquee" aria-label={content.marquee_text}>
         <div className="showcase__marquee-track">
           {Array.from({ length: 8 }).map((_, i) => (
             <span key={i} className="showcase__marquee-item">
-              Order Now
+              {content.marquee_text}
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path
                   d="M7.05 16.95 16.95 7.05M16.95 7.05H8.46M16.95 7.05v8.49"

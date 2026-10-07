@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 // @ts-ignore: CSS module import for side effects
 import "./hero.css";
 import type { Hero as HeroContent } from "@/lib/content/types";
+import Img from "@/components/ui/Img";
 
 // Used until pictures are chosen for the hero in the admin.
 const fallbackSlides = [
@@ -140,7 +141,7 @@ export default function Hero({ content }: { content: HeroContent }) {
       </div>
 
       <div className="hero__media is-mobile">
-        <img className="hero__image" src={mobileImage} alt="" />
+        <Img className="hero__image" src={mobileImage} alt="" />
         <div className="hero__shade" />
         <div className="hero__texture" />
         {overlay}

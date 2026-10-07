@@ -4,6 +4,7 @@ import { useReveal } from "@/lib/useReveal";
 import type { Gallery as Content } from "@/lib/content/types";
 // @ts-ignore: CSS module import for side effects
 import "./landing-sections.css";
+import Img from "@/components/ui/Img";
 
 const arrow = (
   <span className="button__icon">
@@ -34,7 +35,7 @@ export default function GalleryStrip({ content }: { content: Content }) {
         <div className="gal__strip" data-reveal>
           {images.map((g, i) => (
             <figure className="gal__item" key={`${g.image.media_id}-${i}`}>
-              <img
+              <Img
                 src={g.image.url}
                 alt={g.image.alt || g.caption}
                 width={g.image.width || undefined}

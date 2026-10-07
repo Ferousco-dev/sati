@@ -5,15 +5,12 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 // @ts-ignore: CSS module import for side effects
 import "./navbar.css";
+import Img from "@/components/ui/Img";
+import { fallbackLogo } from "@/lib/fallbacks";
+import type { Navigation as NavigationContent } from "@/lib/content/types";
 
-const links = [
-  { label: "Our Brand", href: "/#brand" },
-  { label: "Stores", href: "/#stores" },
-  { label: "Our Menu", href: "/menu" },
-  { label: "My Orders", href: "/account" },
-];
-
-export default function Navbar() {
+export default function Navbar({ content }: { content: NavigationContent }) {
+  const links = content.links.map((l) => ({ label: l.label, href: l.url }));
   const [open, setOpen] = useState(false);
   const { count, setCartOpen } = useStore();
   const router = useRouter();
@@ -21,8 +18,8 @@ export default function Navbar() {
   return (
     <nav className="nav">
       <div className="nav__container">
-        <a href="/" className="nav__logo" aria-label="SATI-L Yoghurt & Confectionery home">
-          <img src="/images/logo.png" alt="SATI-L Yoghurt & Confectionery" />
+        <a href="/" className="nav__logo" aria-label={`${content.logo_alt} home`}>
+          <Img src={content.logo?.url ?? fallbackLogo} alt={content.logo_alt} />
         </a>
 
         <div className={`nav__menu ${open ? "is-open" : ""}`}>
@@ -44,7 +41,7 @@ export default function Navbar() {
           onClick={() => (count > 0 ? setCartOpen(true) : router.push("/menu"))}
           data-magnetic
         >
-          {count > 0 ? `Cart (${count})` : "Order Now"}
+          {count > 0 ? `${content.cart_label} (${count})` : content.order_label}
         </button>
 
         <button

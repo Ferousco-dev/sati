@@ -9,6 +9,7 @@ import OrderTracker from "@/components/OrderTracker";
 import "../order/order.css";
 // @ts-ignore: CSS module import for side effects
 import "./account.css";
+import Img from "@/components/ui/Img";
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -133,7 +134,7 @@ export default function AccountPage() {
                     <ul className="record__lines">
                       {order.lines.map((line) => (
                         <li key={line.id}>
-                          <img src={line.image} alt="" />
+                          <Img src={line.image} alt="" />
                           <span>
                             {line.qty}× {line.name}
                           </span>

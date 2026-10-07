@@ -6,6 +6,7 @@ import { useSplitReveal } from "@/lib/useSplitReveal";
 // @ts-ignore: CSS module import for side effects
 import "./catering.css";
 import type { Catering as CateringContent, StoreInfo } from "@/lib/content/types";
+import Img from "@/components/ui/Img";
 
 const wing = (
   <svg
@@ -56,7 +57,7 @@ export default function Catering({ content, store }: { content: CateringContent;
     <section className="catering" id="stores">
       <div className="catering__inner">
         <div className="catering__banner" data-reveal>
-          <img
+          <Img
             className="catering__banner-img"
             src={content.banner_image?.url ?? "/images/locations/catering.avif"}
             alt={content.banner_image?.alt || "Catering spread"}
@@ -107,7 +108,7 @@ export default function Catering({ content, store }: { content: CateringContent;
                 <span className="button__inner" />
               </a>
             </div>
-            <img
+            <Img
               className="find-local__map"
               src="/images/locations/map.png"
               alt=""

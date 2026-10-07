@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import SiteNavbar from "@/components/SiteNavbar";
 import Hero from "@/components/Hero";
 import ProductShowcase from "@/components/ProductShowcase";
 import Catering from "@/components/Catering";
@@ -16,12 +16,12 @@ export default async function Home() {
 
   return (
     <>
-      <Navbar />
+      <SiteNavbar />
       <AnnouncementBar content={content.announcement} />
       <Hero content={content.hero} />
-      <ProductShowcase />
+      <ProductShowcase content={content.showcase} />
       <Catering content={content.catering} store={store} />
-      <OurMenu />
+      <OurMenu content={content.menu_section} />
       <GalleryStrip content={content.gallery} />
       <SiteFooter />
     </>

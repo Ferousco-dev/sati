@@ -147,6 +147,14 @@ NEXT_PUBLIC_API_URL=
 
 The API accepts requests from `http://localhost:3000` and `http://localhost:8000`, so use one of those addresses in development.
 
+## Content is edited by the admin, not in the code
+
+Everything a visitor reads or sees on the public pages comes from the content API, never from the components. The navbar, hero, product cards, menu headings, catering, footer links and button labels each read one content section (`src/lib/content/types.ts`), so the admin can change them without a developer. `src/lib/content/defaults.ts` and `src/lib/fallbacks.ts` hold the built-in wording and pictures that show until the admin publishes something, or if the API is down. When you add a new piece of visible text or a picture, add it to a content section in the backend (`backend/internal/cms/sections.go`), read it through the content API, and give it a default. Do not write it into a component.
+
+Menu items and prices are not content. They come from the catalog API, because they are products.
+
+Every picture uses the `Img` component (`src/components/ui/Img.tsx`), which shows a shimmer until the picture has loaded.
+
 ## Landing page content
 
 The landing page keeps its original order: hero, product showcase, catering, menu, then a gallery strip (hidden until the admin adds pictures), and the footer, which is unchanged. The hero, catering, gallery, the top announcement bar and the page title come from the API (`GET /api/v1/content`), and the map comes from `GET /api/v1/store`. The pages refresh from the API every minute, and if the API is down they fall back to built-in defaults in `src/lib/content/defaults.ts`.

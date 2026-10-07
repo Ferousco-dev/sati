@@ -48,7 +48,62 @@ export const defaultContent: SiteContent = {
     cta_label: "Learn more",
     cta_url: "#catering",
   },
-  footer: { tagline: "Make you ask for more", columns: [], legal_text: "" },
+  footer: {
+    tagline: "Make you ask for more",
+    cta_label: "Order Now",
+    cta_url: "/menu",
+    columns: [
+      {
+        title: "Menu",
+        links: [
+          { label: "Parfait", url: "/menu#parfait" },
+          { label: "Desserts & Cakes", url: "/menu#cakes" },
+          { label: "Small Chops", url: "/menu#small-chops" },
+          { label: "Yoghurt", url: "/menu#yoghurt" },
+          { label: "Healthy Drinks", url: "/menu#drinks" },
+        ],
+      },
+      {
+        title: "SATI-L",
+        links: [
+          { label: "Our Story", url: "/brand" },
+          { label: "Find a Spot", url: "/stores" },
+          { label: "Catering", url: "/catering" },
+          { label: "Careers", url: "/careers" },
+        ],
+      },
+      {
+        title: "Visit",
+        links: [
+          { label: "Visit our store", url: "/stores" },
+          { label: "Open 9am – 11pm daily", url: "/stores" },
+          { label: "hello@orentegrills.com", url: "mailto:hello@orentegrills.com" },
+        ],
+      },
+    ],
+    legal_text: "",
+  },
+  navigation: {
+    logo_alt: "SATI-L Yoghurt & Confectionery",
+    links: [
+      { label: "Our Brand", url: "/#brand" },
+      { label: "Stores", url: "/#stores" },
+      { label: "Our Menu", url: "/menu" },
+      { label: "My Orders", url: "/account" },
+    ],
+    order_label: "Order Now",
+    cart_label: "Cart",
+  },
+  // Empty until the admin chooses pictures. The page then uses the built-in cards in src/lib/fallbacks.ts.
+  showcase: { items: [], order_label: "Order Now", marquee_text: "Order Now", marquee_url: "/menu" },
+  menu_section: {
+    script_lines: ["Sweet treats", "& healthy sips"],
+    intro_lines: ["Fresh & sweet", "for every occasion"],
+    intro_button: "See the full menu",
+    all_label: "All",
+    add_label: "Add to bag",
+    slide_images: [],
+  },
   announcement: { enabled: false, text: "", link_label: "", link_url: "" },
   seo: {
     title: "SATI-L Yoghurt & Confectionery — Parfait, Cakes, Small Chops & More",

@@ -4,19 +4,12 @@ import { useMemo, useState } from "react";
 import { useReveal } from "@/lib/useReveal";
 import { useStore } from "@/lib/store";
 import { MENU, MENU_ITEMS, naira } from "@/lib/menu";
+import { fallbackMenuSlides } from "@/lib/fallbacks";
+import type { MenuSection as MenuContent } from "@/lib/content/types";
 // @ts-ignore: CSS module import for side effects
 import "./our-menu.css";
+import Img from "@/components/ui/Img";
 
-const FILTERS = [{ id: "all", name: "All" }, ...MENU.map((c) => ({ id: c.id, name: c.name }))];
-
-const strip = [
-  "/images/products/pizza.webp",
-  "/images/products/beast-fuel.webp",
-  "/images/products/chicken.webp",
-  "/images/products/shawarma.webp",
-  "/images/products/yogurt-chicken-chips.webp",
-  "/images/products/cake.webp",
-];
 
 const labels = ["", "", "", "", "Fun. fast. loud"];
 
@@ -26,7 +19,17 @@ const ITEM_CATEGORY: Record<string, string> = Object.fromEntries(
 );
 
 // The link to the full menu is only for the landing page, the menu page already is the full menu.
-export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?: boolean }) {
+export default function OurMenu({
+  content,
+  showFullMenuLink = true,
+}: {
+  content: MenuContent;
+  showFullMenuLink?: boolean;
+}) {
+  const strip = content.slide_images.length
+    ? content.slide_images.map((i) => i.url ?? "")
+    : fallbackMenuSlides;
+  const FILTERS = [{ id: "all", name: content.all_label }, ...MENU.map((c) => ({ id: c.id, name: c.name }))];
   useReveal();
   const { add } = useStore();
   const [filter, setFilter] = useState("all");
@@ -53,7 +56,7 @@ export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?
         <div className="menu__slider" aria-hidden="true">
           <div className="menu__slider-track">
             {[...strip, ...strip, ...strip].map((src, i) => (
-              <img
+              <Img
                 key={i}
                 className="menu__slider-img"
                 src={src}
@@ -64,22 +67,28 @@ export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?
           </div>
         </div>
         <p className="menu__script">
-          Sweet treats
-          <br />
-          &amp; healthy sips
+          {content.script_lines.map((line, i) => (
+            <span key={i}>
+              {i > 0 ? <br /> : null}
+              {line}
+            </span>
+          ))}
         </p>
       </div>
 
       <div className="menu__grid">
         <div className="menu__intro" data-reveal>
           <h3 className="menu__intro-title">
-            Fresh <span className="menu__amp">&amp;</span> sweet
-            <br />
-            for every occasion
+            {content.intro_lines.map((line, i) => (
+              <span key={i}>
+                {i > 0 ? <br /> : null}
+                {line}
+              </span>
+            ))}
           </h3>
           {showFullMenuLink ? (
             <a href="/menu" className="button menu__button" data-magnetic>
-              <span className="button__text">See the full menu</span>
+              <span className="button__text">{content.intro_button}</span>
               <span className="button__icon">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
@@ -116,7 +125,7 @@ export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?
           {items.map((item) => (
             <article key={item.id} className="menu-card">
               <div className="menu-card__img-wrap">
-                <img
+                <Img
                   className="menu-card__img"
                   src={item.image}
                   alt={item.name}
@@ -144,7 +153,7 @@ export default function OurMenu({ showFullMenuLink = true }: { showFullMenuLink?
                     onClick={() => add(item)}
                     aria-label={`Add ${item.name} to bag`}
                   >
-                    Add to bag
+                    {content.add_label}
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path
                         d="M7.05 16.95 16.95 7.05M16.95 7.05H8.46M16.95 7.05v8.49"

@@ -1,54 +1,60 @@
 // @ts-ignore: CSS module import for side effects
 import "./footer.css";
 import InstallButton from "@/components/InstallButton";
+import { fallbackLogo } from "@/lib/fallbacks";
+import type { Footer as FooterContent, Navigation, StoreInfo } from "@/lib/content/types";
+import Img from "@/components/ui/Img";
 
-const columns = [
-  {
-    title: "Menu",
-    links: [
-      { label: "Parfait", href: "/menu#parfait" },
-      { label: "Desserts & Cakes", href: "/menu#cakes" },
-      { label: "Small Chops", href: "/menu#small-chops" },
-      { label: "Yoghurt", href: "/menu#yoghurt" },
-      { label: "Healthy Drinks", href: "/menu#drinks" },
-    ],
-  },
-  {
-    title: "SATI-L",
-    links: [
-      { label: "Our Story", href: "/brand" },
-      { label: "Find a Spot", href: "/stores" },
-      { label: "Catering", href: "/catering" },
-      { label: "Careers", href: "/careers" },
-    ],
-  },
-  {
-    title: "Visit",
-    links: [
-      { label: "Visit our store", href: "/stores" },
-      { label: "Open 9am – 11pm daily", href: "/stores" },
-      {
-        label: "hello@orentegrills.com",
-        href: "mailto:hello@orentegrills.com",
-      },
-    ],
-  },
-];
+const SOCIALS = ["Instagram", "TikTok", "WhatsApp", "Facebook"] as const;
 
-const socials = ["Instagram", "TikTok", "WhatsApp", "Facebook"];
+function socialUrl(name: (typeof SOCIALS)[number], store: StoreInfo): string {
+  const urls = {
+    Instagram: store.instagram_url,
+    TikTok: store.tiktok_url,
+    WhatsApp: store.whatsapp_url,
+    Facebook: store.facebook_url,
+  };
+  return urls[name] || "#";
+}
 
-export default function Footer() {
+export default function Footer({
+  content,
+  store,
+  navigation,
+}: {
+  content: FooterContent;
+  store: StoreInfo;
+  navigation: Navigation;
+}) {
+  const columns = content.columns.map((c) => ({
+    title: c.title,
+    links: c.links.map((l) => ({ label: l.label, href: l.url })),
+  }));
+
+  // The store address and phone from the admin settings lead the Visit column, above its other links.
+  const contact = [
+    store.address && {
+      label: store.address,
+      href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`,
+    },
+    store.phone && { label: store.phone, href: `tel:${store.phone.replace(/\s+/g, "")}` },
+  ].filter(Boolean) as { label: string; href: string }[];
+  if (contact.length) {
+    const visit = columns.find((c) => c.title === "Visit");
+    if (visit) visit.links = [...contact, ...visit.links];
+    else columns.push({ title: "Visit", links: contact });
+  }
   return (
     <footer className="footer">
       <div className="footer__inner">
         <div className="footer__top">
           <div className="footer__brand">
-            <img
-              src="/images/logo.png"
-              alt="SATI-L Yoghurt & Confectionery"
+            <Img
+              src={navigation.logo?.url ?? fallbackLogo}
+              alt={navigation.logo_alt}
               className="footer__logo"
             />
-            <p className="footer__tagline">Make you ask for more</p>
+            {content.tagline ? <p className="footer__tagline">{content.tagline}</p> : null}
             <InstallButton />
           </div>
 
@@ -70,8 +76,8 @@ export default function Footer() {
           </nav>
         </div>
 
-        <a href="/menu" className="footer__cta" data-magnetic>
-          <span>Order Now</span>
+        <a href={content.cta_url || "/menu"} className="footer__cta" data-magnetic>
+          <span>{content.cta_label}</span>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M5 12h14M13 6l6 6-6 6"
@@ -83,11 +89,14 @@ export default function Footer() {
           </svg>
         </a>
         <div className="footer__bottom">
-          <span>© {2026} SATI-L Yoghurt & confectionery . All rights reserved.</span>
+          <span>
+            © {new Date().getFullYear()} {store.name}. All rights reserved.
+            {content.legal_text ? ` ${content.legal_text}` : ""}
+          </span>
           <div className="footer__socials">
-            {socials.map((s) => (
-              <a key={s} href="#" className="footer__social">
-                {s}
+            {SOCIALS.map((name) => (
+              <a key={name} href={socialUrl(name, store)} className="footer__social">
+                {name}
               </a>
             ))}
           </div>
@@ -103,7 +112,7 @@ export default function Footer() {
       </div>
 
         <div className="footer__wordmark" aria-hidden="true">
-          SATI-L Yoghurt & confectionery 
+          {store.name}
         </div>
     </footer>
   );

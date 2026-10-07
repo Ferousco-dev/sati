@@ -6,6 +6,7 @@ import { ADDONS, naira } from "@/lib/menu";
 import OrderSuccess from "@/components/OrderSuccess";
 // @ts-ignore: CSS module import for side effects
 import "./order.css";
+import Img from "@/components/ui/Img";
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -133,7 +134,7 @@ export default function OrderPage() {
         <ul className="order-lines">
           {cart.map((line) => (
             <li key={line.id} className="order-line">
-              <img src={line.image} alt={line.name} />
+              <Img src={line.image} alt={line.name} />
               <div className="order-line__body">
                 <p className="order-line__name">{line.name}</p>
                 <p className="order-line__price">{naira(line.price)} each</p>
@@ -182,7 +183,7 @@ export default function OrderPage() {
                     className="upsell__item"
                     onClick={() => addQuiet(addon)}
                   >
-                    <img src={addon.image} alt="" />
+                    <Img src={addon.image} alt="" />
                     <span className="upsell__name">{addon.name}</span>
                     <span className="upsell__add">
                       + {naira(addon.price)}

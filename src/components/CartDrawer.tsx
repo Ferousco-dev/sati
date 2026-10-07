@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { naira } from "@/lib/menu";
 // @ts-ignore: CSS module import for side effects
 import "./cart-drawer.css";
+import Img from "@/components/ui/Img";
 
 export default function CartDrawer() {
   const { cart, count, total, cartOpen, setCartOpen, remove, setQty } =
@@ -79,7 +80,7 @@ export default function CartDrawer() {
           <ul className="drawer__list">
             {cart.map((line) => (
               <li key={line.id} className="drawer-line">
-                <img
+                <Img
                   className="drawer-line__img"
                   src={line.image}
                   alt={line.name}

@@ -49,8 +49,34 @@ export type Catering = {
   cta_url: string;
 };
 
+export type Navigation = {
+  logo?: Picture;
+  logo_alt: string;
+  links: Link[];
+  order_label: string;
+  cart_label: string;
+};
+
+export type Showcase = {
+  items: { name: string; image: Picture; product_id: string }[];
+  order_label: string;
+  marquee_text: string;
+  marquee_url: string;
+};
+
+export type MenuSection = {
+  script_lines: string[];
+  intro_lines: string[];
+  intro_button: string;
+  all_label: string;
+  add_label: string;
+  slide_images: Picture[];
+};
+
 export type Footer = {
   tagline: string;
+  cta_label: string;
+  cta_url: string;
   columns: { title: string; links: Link[] }[];
   legal_text: string;
 };
@@ -91,6 +117,9 @@ export type SiteContent = {
   announcement: Announcement;
   seo: Seo;
   layout: Layout;
+  navigation: Navigation;
+  showcase: Showcase;
+  menu_section: MenuSection;
 };
 
 export type DayHours = { open: string; close: string } | null;

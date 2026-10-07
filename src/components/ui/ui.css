@@ -233,3 +233,11 @@
     background-position: -200% 0;
   }
 }
+
+/* Image loader: a shimmer that stays until the picture arrives. */
+.ui-img.is-loading {
+  background: linear-gradient(100deg, rgba(var(--heading-rgb), 0.08) 30%, rgba(var(--heading-rgb), 0.16) 50%, rgba(var(--heading-rgb), 0.08) 70%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+  color: transparent;
+}
