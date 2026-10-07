@@ -1,0 +1,1340 @@
+openapi: 3.0.3
+info:
+  title: SATI Yoghurt API
+  version: 1.0.0
+  description: |
+    REST API for the SATI Yoghurt ordering platform. Money is always an integer in kobo.
+    Sessions use the HttpOnly cookie sati_session. Every error is {"error":{"code":"...","message":"..."}}.
+    Each operation lists who may call it in x-access: public, customer (any signed-in user), staff, admin, rider or metrics.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sati_session
+    metricsToken:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
+  responses:
+    BadRequest:
+      description: "Validation failed or the body is not valid JSON."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: "Not signed in."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: "Signed in without the required role, or the request origin is not allowed."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: "The resource does not exist or belongs to someone else."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: "The request conflicts with the current state."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    TooManyRequests:
+      description: "Rate limit reached. See the Retry-After header."
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+paths:
+  /api/v1/addresses:
+    get:
+      tags: ["Addresses"]
+      summary: "List the customer's saved addresses."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Addresses"]
+      summary: "Save an address."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipient_name: {type: string}
+                phone: {type: string}
+                address_line: {type: string}
+                area: {type: string}
+                city: {type: string}
+                instructions: {type: string}
+                zone_id: {type: string}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/addresses/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: ["Addresses"]
+      summary: "Delete a saved address."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: ["Addresses"]
+      summary: "Update a saved address."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipient_name: {type: string}
+                phone: {type: string}
+                address_line: {type: string}
+                area: {type: string}
+                city: {type: string}
+                instructions: {type: string}
+                zone_id: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/audit-logs:
+    get:
+      tags: ["Admin"]
+      summary: "Search the audit log."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/categories:
+    get:
+      tags: ["Catalog admin"]
+      summary: "List all categories."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Catalog admin"]
+      summary: "Create a category."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                description: {type: string}
+                sort_order: {type: integer}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/categories/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Catalog admin"]
+      summary: "Update a category."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                description: {type: string}
+                sort_order: {type: integer}
+                active: {type: boolean}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/customers:
+    get:
+      tags: ["Admin"]
+      summary: "List customers with order counts and total spent."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/dashboard:
+    get:
+      tags: ["Admin"]
+      summary: "Today's orders, revenue and the open order queue. Accepts ?tz=."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/delivery:
+    get:
+      tags: ["Delivery admin"]
+      summary: "List deliveries."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/delivery/zones:
+    get:
+      tags: ["Delivery admin"]
+      summary: "List all delivery zones."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Delivery admin"]
+      summary: "Create a delivery zone."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                fee_kobo: {type: integer}
+                sort_order: {type: integer}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/delivery/zones/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Delivery admin"]
+      summary: "Update a delivery zone."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                fee_kobo: {type: integer}
+                active: {type: boolean}
+                sort_order: {type: integer}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/orders:
+    get:
+      tags: ["Admin orders"]
+      summary: "List orders with filters."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/orders/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Admin orders"]
+      summary: "Get an order with customer, payments and delivery."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/orders/{id}/payment":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Admin orders"]
+      summary: "Record a cash or bank transfer payment as received."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/orders/{id}/rider":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Admin orders"]
+      summary: "Assign or reassign a rider."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rider_id: {type: string}
+                notes: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/orders/{id}/status":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Admin orders"]
+      summary: "Move an order to its next status."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string}
+                reason: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/payments:
+    get:
+      tags: ["Admin payments"]
+      summary: "List payments. Filter with ?needs_refund=true."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/payments/{id}/refunded":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Admin payments"]
+      summary: "Record that a paid payment was refunded."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string}
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/products:
+    get:
+      tags: ["Catalog admin"]
+      summary: "List products for management, including archived."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Catalog admin"]
+      summary: "Create a product."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id: {type: string}
+                name: {type: string}
+                description: {type: string}
+                price_kobo: {type: integer}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/products/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Catalog admin"]
+      summary: "Update a product."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id: {type: string}
+                name: {type: string}
+                description: {type: string}
+                price_kobo: {type: integer}
+                active: {type: boolean}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/products/{id}/archive":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Catalog admin"]
+      summary: "Archive a product."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/products/{id}/availability":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Catalog admin"]
+      summary: "Switch a product on or off for ordering."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                available: {type: boolean}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/products/{id}/images":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Catalog admin"]
+      summary: "Upload a JPEG, PNG or WebP image (max 5MB, multipart field image)."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image: {type: string, format: binary}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/products/{id}/images/{imageId}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+      - name: imageId
+        in: path
+        required: true
+        schema: {type: string}
+    delete:
+      tags: ["Catalog admin"]
+      summary: "Remove a product image."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/riders:
+    get:
+      tags: ["Admin"]
+      summary: "List users with the RIDER role."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/settings:
+    get:
+      tags: ["Settings"]
+      summary: "Read store settings."
+      x-access: staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: ["Settings"]
+      summary: "Change store settings."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                delivery_fee_kobo: {type: integer}
+                online_enabled: {type: boolean}
+                bank_transfer_enabled: {type: boolean}
+                pay_on_pickup_enabled: {type: boolean}
+                pay_on_delivery_enabled: {type: boolean}
+                bank_name: {type: string}
+                bank_account_number: {type: string}
+                bank_account_name: {type: string}
+                whatsapp_number: {type: string}
+                whatsapp_message: {type: string}
+                notification_email: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/admin/users:
+    get:
+      tags: ["Admin"]
+      summary: "List users, optionally by role."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Admin"]
+      summary: "Invite a STAFF, RIDER or ADMIN user by email."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                email: {type: string}
+                role: {description: "STAFF|RIDER|ADMIN"}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/admin/users/{id}/role":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Admin"]
+      summary: "Change a user's role."
+      x-access: admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/forgot-password:
+    post:
+      tags: ["Auth"]
+      summary: "Start a password reset. Always answers 202."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: {type: string}
+      responses:
+        '202':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/login:
+    post:
+      tags: ["Auth"]
+      summary: "Sign in and start a session."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: {type: string}
+                password: {type: string}
+                remember_me: {type: boolean}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/logout:
+    post:
+      tags: ["Auth"]
+      summary: "End the current session. Always succeeds."
+      x-access: public
+      security: []
+      responses:
+        '204':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/me:
+    get:
+      tags: ["Auth"]
+      summary: "Return the signed-in user."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/register:
+    post:
+      tags: ["Auth"]
+      summary: "Create a customer account and start a session."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                email: {type: string}
+                password: {type: string}
+                remember_me: {type: boolean}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/resend-verification:
+    post:
+      tags: ["Auth"]
+      summary: "Send a new verification email (60 second cooldown)."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '202':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/reset-password:
+    post:
+      tags: ["Auth"]
+      summary: "Set a new password with a reset or invite token."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: {type: string}
+                password: {type: string}
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/verify-email:
+    post:
+      tags: ["Auth"]
+      summary: "Verify an email address with a token."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: {type: string}
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/categories:
+    get:
+      tags: ["Catalog"]
+      summary: "List active categories. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/categories/{id}/products":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Catalog"]
+      summary: "List products in a category. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/checkout/options:
+    get:
+      tags: ["Orders"]
+      summary: "Payment methods, delivery zones and fee for checkout. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/delivery/zones:
+    get:
+      tags: ["Delivery"]
+      summary: "List active delivery zones. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/files/{path}":
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Operations"]
+      summary: "Uploaded product images (local storage only). Cached for a year."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/health:
+    get:
+      tags: ["Operations"]
+      summary: "Liveness check. Needs the database."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/notifications:
+    get:
+      tags: ["Notifications"]
+      summary: "List the user's notifications."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/notifications/read-all:
+    post:
+      tags: ["Notifications"]
+      summary: "Mark every notification as read."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/notifications/unread-count:
+    get:
+      tags: ["Notifications"]
+      summary: "Count unread notifications."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/notifications/{id}/read":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Notifications"]
+      summary: "Mark one notification as read."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/openapi.yaml:
+    get:
+      tags: ["Operations"]
+      summary: "This document."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/orders:
+    get:
+      tags: ["Orders"]
+      summary: "List the customer's orders."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: ["Orders"]
+      summary: "Place an order from product ids and quantities. Honours an Idempotency-Key header."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items: {description: "array of {product_id, quantity}"}
+                fulfillment: {description: "{type: PICKUP|DELIVERY, address_id}"}
+                payment_method: {description: "ONLINE|BANK_TRANSFER|PAY_ON_PICKUP|PAY_ON_DELIVERY"}
+                notes: {type: string}
+      responses:
+        '201':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/orders/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Orders"]
+      summary: "Get one of the customer's orders."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/orders/{id}/cancel":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: ["Orders"]
+      summary: "Cancel an order that is still PENDING."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/orders/{id}/status":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Orders"]
+      summary: "Get an order's current status."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/payments/initialize:
+    post:
+      tags: ["Payments"]
+      summary: "Start an online payment attempt for an order."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order_id: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/payments/verify:
+    post:
+      tags: ["Payments"]
+      summary: "Ask the gateway about a payment and apply the result."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reference: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/payments/{reference}":
+    parameters:
+      - name: reference
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Payments"]
+      summary: "Get one of the customer's payments by reference."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/products:
+    get:
+      tags: ["Catalog"]
+      summary: "List products. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/products/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: ["Catalog"]
+      summary: "Get one product. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/ready:
+    get:
+      tags: ["Operations"]
+      summary: "Readiness report with database and Redis checks."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/rider/deliveries:
+    get:
+      tags: ["Rider"]
+      summary: "The rider's own jobs. ?status=all adds finished ones."
+      x-access: rider
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  "/api/v1/rider/deliveries/{id}/status":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: ["Rider"]
+      summary: "Move the rider's own delivery to PICKED_UP, DELIVERED or FAILED."
+      x-access: rider
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {description: "PICKED_UP|DELIVERED|FAILED"}
+                reason: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/webhooks/paystack:
+    post:
+      tags: ["Payments"]
+      summary: "Paystack webhook. Checked with the X-Paystack-Signature header."
+      x-access: public
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: {type: string}
+                data: {type: object}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /metrics:
+    get:
+      tags: ["Operations"]
+      summary: "Prometheus metrics. Needs the METRICS_TOKEN bearer token. Not served when no token is set."
+      x-access: metrics
+      security:
+        - metricsToken: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}

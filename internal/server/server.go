@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
@@ -46,6 +47,8 @@ type Handlers struct {
 
 	// Limiter counts requests for rate limiting. Nil switches rate limiting off.
 	Limiter ratelimit.Limiter
+	// OpenAPI is the API description served at /api/v1/openapi.yaml.
+	OpenAPI []byte
 	// MetricsToken protects GET /metrics. Empty leaves the endpoint out entirely.
 	MetricsToken string
 }
@@ -65,6 +68,14 @@ func New(cfg config.Config, log *slog.Logger, h Handlers) *App {
 	mux.HandleFunc("GET /api/v1/ready", h.Health.Ready)
 	if h.MetricsToken != "" {
 		mux.HandleFunc("GET /metrics", metricsHandler(h.MetricsToken))
+	}
+	if len(h.OpenAPI) > 0 {
+		spec := h.OpenAPI
+		cached := middleware.PublicCache(5*time.Minute, time.Hour)
+		mux.Handle("GET /api/v1/openapi.yaml", cached(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+			_, _ = w.Write(spec)
+		})))
 	}
 	if h.Limiter != nil {
 		h.Auth.WithLimiter(h.Limiter)

@@ -21,6 +21,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
+	"github.com/Ferousco-dev/sati/backend/api"
 	"github.com/Ferousco-dev/sati/backend/db"
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
@@ -56,7 +57,7 @@ type catalogEnv struct {
 	pool     *pgxpool.Pool
 	orderSvc *orders.Service
 	paystack *fakePaystack
-	srv      http.Handler
+	srv      *App
 	queryRow func(query string, args ...any) pgx.Row
 	mailer   *captureMailer
 	exec     func(query string, args ...any)
@@ -114,6 +115,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		t.Fatal(err)
 	}
 	handlers := Handlers{
+		OpenAPI:       api.Spec,
 		Limiter:       ratelimit.NewMemory(),
 		MetricsToken:  "metrics-secret",
 		Health:        health.New(pool),

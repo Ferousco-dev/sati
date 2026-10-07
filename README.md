@@ -825,22 +825,24 @@ The application should refuse to start in production when required secrets are m
 
 ## Rate limiting
 
-Authentication, payment, webhook and other sensitive endpoints are rate limited.
+Counters live in Redis when `REDIS_URL` is set, so every API instance shares them. Without Redis each instance counts in memory. If Redis goes down requests are allowed instead of blocked, and the failure is logged.
 
-Rate limits are applied per client IP and, where appropriate, per authenticated account.
+A request over a limit gets `429` with `RATE_LIMITED` and a `Retry-After` header in seconds. Limits are per client IP, or per signed-in session where noted. Every policy that matches a request applies, and all of them are in `internal/server/limits.go`.
 
-Important routes include:
+| Route | Limit |
+| --- | --- |
+| Every route | 600 per minute |
+| `POST /auth/register` | 10 per hour |
+| `POST /auth/login` | 20 per 15 minutes per IP, and 8 per 15 minutes per account |
+| `POST /auth/forgot-password` | 5 per hour |
+| `POST /auth/reset-password`, `/auth/verify-email` | 10 per 15 minutes |
+| `POST /auth/resend-verification` | 3 per 10 minutes per session |
+| `POST /orders` | 30 per hour per session |
+| `POST /payments/initialize` | 20 per 10 minutes per session |
+| `POST /payments/verify` | 40 per 10 minutes per session |
+| `POST /webhooks/paystack` | 300 per minute |
 
-- Registration
-- Login
-- Password reset
-- Email verification
-- Payment initialization
-- Payment verification
-- Admin authentication
-- Public API endpoints
-
-The backend must correctly identify the client IP when running behind the configured reverse proxy.
+`/health`, `/ready`, `/metrics` and uploaded files are never limited. The backend reads the client address from `X-Forwarded-For` only when the request comes from a proxy listed in `TRUSTED_PROXIES`.
 
 ## Security
 
@@ -864,30 +866,20 @@ The API follows several security rules:
 
 ## Audit logs
 
-Important administrative and security actions are recorded.
+Every successful request by STAFF, ADMIN or RIDER that changes something is recorded: who did it, their role, the route, the record's id, the IP, the request id and the time. Reads are not recorded. Sign-ins are recorded for staff, admins and riders, and every failed sign-in is recorded with the email that was tried.
 
-Examples include:
+Request contents are never stored, so no bank details, emails, passwords or tokens end up in the log.
 
-- Product creation
-- Product updates
-- Product archival
-- Order status changes
-- Rider assignment
-- Payment actions
-- Store setting changes
-- Administrative authentication events
+`GET /api/v1/admin/audit-logs` (ADMIN) searches it with `actor_id`, `action`, `entity_type`, `entity_id`, `from` and `to`.
 
-Audit logs provide an operational history without exposing sensitive authentication credentials.
+## Health, metrics and API documentation
 
-## Health
-
-```text
-GET /api/v1/health
-```
-
-The health endpoint checks that the API is running and that required infrastructure is available according to the configured health policy.
-
-The deployment platform uses this endpoint to determine whether the service is ready to receive traffic.
+- `GET /api/v1/health` says the API is running and can reach PostgreSQL.
+- `GET /api/v1/ready` is for load balancers. It returns `503` when the database is down, and `200` with `"status":"degraded"` when only Redis is down.
+- `GET /metrics` serves Prometheus metrics: requests and latency by route, rate limit rejections, orders placed, order status changes, payment and webhook outcomes, emails sent, retried and failed, queue sizes, orders waiting for refund, and Go runtime stats. It needs `Authorization: Bearer <METRICS_TOKEN>` and is not served at all when `METRICS_TOKEN` is empty. Routes appear by pattern (`GET /api/v1/orders/{id}`), never with real ids.
+- Every request is logged with a request id, its route, status, duration and client IP. Server errors are logged at error level, and panics are caught with their stack. Passwords, cookies, tokens and request bodies are never logged.
+- Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` and `Permissions-Policy`, and production also sends `Strict-Transport-Security`.
+- `GET /api/v1/openapi.yaml` serves the OpenAPI description from `api/openapi.yaml`. A test fails if a route is missing from it or documented but not real. Another test calls every route as each kind of user and checks that its documented `x-access` is enforced.
 
 ## Scripts
 

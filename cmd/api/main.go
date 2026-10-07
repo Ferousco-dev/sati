@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ferousco-dev/sati/backend/api"
 	"github.com/Ferousco-dev/sati/backend/internal/addresses"
 	"github.com/Ferousco-dev/sati/backend/internal/admin"
 	"github.com/Ferousco-dev/sati/backend/internal/analytics"
@@ -103,6 +104,7 @@ func run() error {
 		healthHandler.WithRedis(redisPinger{redisClient})
 	}
 	handlers := server.Handlers{
+		OpenAPI:       api.Spec,
 		Limiter:       limiter,
 		MetricsToken:  cfg.MetricsToken,
 		Health:        health.New(pool),
