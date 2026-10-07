@@ -249,6 +249,8 @@ type FooterColumn struct {
 
 type Footer struct {
 	Tagline   string         `json:"tagline"`
+	CTALabel  string         `json:"cta_label"`
+	CTAURL    string         `json:"cta_url"`
 	Columns   []FooterColumn `json:"columns"`
 	LegalText string         `json:"legal_text"`
 }
@@ -263,6 +265,8 @@ func (s *Footer) normalize(c *check) {
 		}
 	}
 	c.text("tagline", &s.Tagline, 0, 80)
+	c.text("cta_label", &s.CTALabel, 0, 30)
+	c.link("cta_url", &s.CTAURL, false)
 	c.count("columns", len(s.Columns), 0, 4)
 	for i := range s.Columns {
 		col := &s.Columns[i]
@@ -274,6 +278,89 @@ func (s *Footer) normalize(c *check) {
 		}
 	}
 	c.text("legal_text", &s.LegalText, 0, 200)
+}
+
+type Navigation struct {
+	Logo       *Image `json:"logo,omitempty"`
+	LogoAlt    string `json:"logo_alt"`
+	Links      []Link `json:"links"`
+	OrderLabel string `json:"order_label"`
+	CartLabel  string `json:"cart_label"`
+}
+
+func (s *Navigation) normalize(c *check) {
+	if s.Logo != nil {
+		c.image("logo", s.Logo, true)
+	}
+	c.text("logo_alt", &s.LogoAlt, 0, 80)
+	if s.Links == nil {
+		s.Links = []Link{}
+	}
+	c.count("links", len(s.Links), 0, 6)
+	for i := range s.Links {
+		c.text(fmt.Sprintf("links[%d].label", i), &s.Links[i].Label, 1, 30)
+		c.link(fmt.Sprintf("links[%d].url", i), &s.Links[i].URL, true)
+	}
+	c.text("order_label", &s.OrderLabel, 1, 20)
+	c.text("cart_label", &s.CartLabel, 1, 20)
+}
+
+type ShowcaseItem struct {
+	Name      string `json:"name"`
+	Image     Image  `json:"image"`
+	ProductID string `json:"product_id"`
+}
+
+type Showcase struct {
+	Items       []ShowcaseItem `json:"items"`
+	OrderLabel  string         `json:"order_label"`
+	MarqueeText string         `json:"marquee_text"`
+	MarqueeURL  string         `json:"marquee_url"`
+}
+
+func (s *Showcase) normalize(c *check) {
+	if s.Items == nil {
+		s.Items = []ShowcaseItem{}
+	}
+	c.count("items", len(s.Items), 0, 8)
+	for i := range s.Items {
+		c.text(fmt.Sprintf("items[%d].name", i), &s.Items[i].Name, 1, 40)
+		c.image(fmt.Sprintf("items[%d].image", i), &s.Items[i].Image, true)
+		c.text(fmt.Sprintf("items[%d].product_id", i), &s.Items[i].ProductID, 0, 64)
+	}
+	c.text("order_label", &s.OrderLabel, 1, 20)
+	c.text("marquee_text", &s.MarqueeText, 1, 30)
+	c.link("marquee_url", &s.MarqueeURL, false)
+}
+
+type MenuSection struct {
+	ScriptLines []string `json:"script_lines"`
+	IntroLines  []string `json:"intro_lines"`
+	IntroButton string   `json:"intro_button"`
+	AllLabel    string   `json:"all_label"`
+	AddLabel    string   `json:"add_label"`
+	SlideImages []Image  `json:"slide_images"`
+}
+
+func (s *MenuSection) normalize(c *check) {
+	if s.SlideImages == nil {
+		s.SlideImages = []Image{}
+	}
+	c.count("script_lines", len(s.ScriptLines), 0, 3)
+	for i := range s.ScriptLines {
+		c.text(fmt.Sprintf("script_lines[%d]", i), &s.ScriptLines[i], 1, 40)
+	}
+	c.count("intro_lines", len(s.IntroLines), 0, 3)
+	for i := range s.IntroLines {
+		c.text(fmt.Sprintf("intro_lines[%d]", i), &s.IntroLines[i], 1, 50)
+	}
+	c.text("intro_button", &s.IntroButton, 1, 30)
+	c.text("all_label", &s.AllLabel, 1, 20)
+	c.text("add_label", &s.AddLabel, 1, 20)
+	c.count("slide_images", len(s.SlideImages), 0, 10)
+	for i := range s.SlideImages {
+		c.image(fmt.Sprintf("slide_images[%d]", i), &s.SlideImages[i], true)
+	}
 }
 
 type Announcement struct {
@@ -389,7 +476,34 @@ var sectionDefs = []sectionDef{
 		}
 	}},
 	{"footer", "Footer", func() section { return &Footer{} }, func() section {
-		return &Footer{Tagline: "Make you ask for more", Columns: []FooterColumn{}}
+		return &Footer{
+			Tagline: "Make you ask for more", CTALabel: "Order Now", CTAURL: "/menu",
+			Columns: []FooterColumn{
+				{"Menu", []Link{{"Parfait", "/menu#parfait"}, {"Desserts & Cakes", "/menu#cakes"}, {"Small Chops", "/menu#small-chops"}, {"Yoghurt", "/menu#yoghurt"}, {"Healthy Drinks", "/menu#drinks"}}},
+				{"SATI-L", []Link{{"Our Story", "/brand"}, {"Find a Spot", "/stores"}, {"Catering", "/catering"}, {"Careers", "/careers"}}},
+				{"Visit", []Link{{"Visit our store", "/stores"}, {"Open 9am – 11pm daily", "/stores"}, {"hello@orentegrills.com", "mailto:hello@orentegrills.com"}}},
+			},
+		}
+	}},
+	{"navigation", "Navigation bar", func() section { return &Navigation{} }, func() section {
+		return &Navigation{
+			LogoAlt: "SATI-L Yoghurt & Confectionery",
+			Links: []Link{
+				{"Our Brand", "/#brand"}, {"Stores", "/#stores"}, {"Our Menu", "/menu"}, {"My Orders", "/account"},
+			},
+			OrderLabel: "Order Now", CartLabel: "Cart",
+		}
+	}},
+	{"showcase", "Product showcase", func() section { return &Showcase{} }, func() section {
+		return &Showcase{Items: []ShowcaseItem{}, OrderLabel: "Order Now", MarqueeText: "Order Now", MarqueeURL: "/menu"}
+	}},
+	{"menu_section", "Menu section", func() section { return &MenuSection{} }, func() section {
+		return &MenuSection{
+			ScriptLines: []string{"Sweet treats", "& healthy sips"},
+			IntroLines:  []string{"Fresh & sweet", "for every occasion"},
+			IntroButton: "See the full menu", AllLabel: "All", AddLabel: "Add to bag",
+			SlideImages: []Image{},
+		}
 	}},
 	{"announcement", "Announcement bar", func() section { return &Announcement{} }, func() section {
 		return &Announcement{}

@@ -98,7 +98,7 @@ func TestPublicContentStartsWithDefaults(t *testing.T) {
 	e := newStaffEnv(t)
 	site, rec := e.site(t)
 
-	for _, key := range []string{"hero", "how_it_works", "testimonials", "gallery", "faq", "catering", "footer", "announcement", "seo", "layout"} {
+	for _, key := range []string{"hero", "how_it_works", "testimonials", "gallery", "faq", "catering", "footer", "announcement", "seo", "layout", "navigation", "showcase", "menu_section"} {
 		if len(site.Sections[key]) == 0 {
 			t.Errorf("section %s is missing", key)
 		}

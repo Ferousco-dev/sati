@@ -76,6 +76,12 @@ func TestValidateRejects(t *testing.T) {
 		"seo title too long":        {"seo", `{"title":"` + long(71) + `"}`},
 		"layout missing sections":   {"layout", `{"sections":[{"key":"hero","visible":true}]}`},
 		"layout unknown key":        {"layout", `{"sections":[{"key":"evil","visible":true},{"key":"products","visible":true},{"key":"how_it_works","visible":true},{"key":"testimonials","visible":true},{"key":"gallery","visible":true},{"key":"catering","visible":true},{"key":"faq","visible":true},{"key":"hours","visible":true}]}`},
+		"nav script link":           {"navigation", `{"links":[{"label":"x","url":"javascript:alert(1)"}],"order_label":"Order","cart_label":"Cart"}`},
+		"nav too many links":        {"navigation", `{"links":[{"label":"1","url":"/"},{"label":"2","url":"/"},{"label":"3","url":"/"},{"label":"4","url":"/"},{"label":"5","url":"/"},{"label":"6","url":"/"},{"label":"7","url":"/"}],"order_label":"Order","cart_label":"Cart"}`},
+		"nav empty order label":     {"navigation", `{"links":[],"order_label":"","cart_label":"Cart"}`},
+		"showcase item no image":    {"showcase", `{"items":[{"name":"x","image":{}}],"order_label":"o","marquee_text":"m"}`},
+		"showcase long product id":  {"showcase", `{"items":[],"order_label":"o","marquee_text":"m","marquee_url":"javascript:x"}`},
+		"menu too many lines":       {"menu_section", `{"script_lines":["1","2","3","4"],"intro_lines":[],"intro_button":"b","all_label":"a","add_label":"d"}`},
 		"layout repeat":             {"layout", `{"sections":[{"key":"hero","visible":true},{"key":"hero","visible":true},{"key":"how_it_works","visible":true},{"key":"testimonials","visible":true},{"key":"gallery","visible":true},{"key":"catering","visible":true},{"key":"faq","visible":true},{"key":"hours","visible":true}]}`},
 	}
 	for name, c := range cases {

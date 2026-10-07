@@ -787,10 +787,13 @@ Admins change the website without code. The editable parts are fixed sections wi
 | `gallery` | Heading, up to 12 pictures with captions, and an Instagram link. |
 | `faq` | Heading and up to 20 questions and answers. |
 | `catering` | Heading, text, banner picture and note, and a button. |
-| `footer` | Tagline, up to 4 link columns and a legal line. |
+| `footer` | Tagline, the Order button, up to 4 link columns and a legal line. |
 | `announcement` | An optional bar at the top: on or off, text and link. |
 | `seo` | Page title, description and share picture. |
 | `layout` | The order of the landing page blocks and which ones are visible. |
+| `navigation` | The logo, the top links and the Order and Cart button labels. |
+| `showcase` | The product cards (name, picture, product to add to the bag) and the scrolling order strip. |
+| `menu_section` | The menu section headings, the script text, the button labels and the sliding pictures. |
 
 A section that nobody has published yet serves a built-in default, so the site works from day one. Testimonials, the gallery and the FAQ start empty. The frontend hides an empty section.
 
