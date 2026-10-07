@@ -109,6 +109,46 @@
   gap: 1.5rem;
 }
 
+/* Search and price filter. The inputs copy the checkout form's input style. */
+.menu__search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.menu__search-input,
+.menu__price-input {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 0.7rem;
+  background: var(--cream);
+  font: inherit;
+  color: var(--black);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.menu__search-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.menu__price-input {
+  flex: 0 1 8rem;
+  min-width: 0;
+}
+
+.menu__search-input:focus,
+.menu__price-input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(var(--cta-rgb), 0.18);
+}
+
+.menu__no-results {
+  margin: 0;
+  color: var(--dark-grey);
+}
+
 .menu__filters {
   display: flex;
   flex-wrap: wrap;

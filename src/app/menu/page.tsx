@@ -10,7 +10,7 @@ export default async function menu(){
   return(
     <>
     <SiteNavbar />
-    <OurMenu content={content.menu_section} showFullMenuLink={false} />
+    <OurMenu content={content.menu_section} showFullMenuLink={false} showSearch />
     <SiteFooter />
     </>
   )

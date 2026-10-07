@@ -22,9 +22,12 @@ const ITEM_CATEGORY: Record<string, string> = Object.fromEntries(
 export default function OurMenu({
   content,
   showFullMenuLink = true,
+  showSearch = false,
 }: {
   content: MenuContent;
   showFullMenuLink?: boolean;
+  // Search and price filter, used on the menu page only.
+  showSearch?: boolean;
 }) {
   const strip = content.slide_images.length
     ? content.slide_images.map((i) => i.url ?? "")
@@ -33,14 +36,27 @@ export default function OurMenu({
   useReveal();
   const { add } = useStore();
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
-  const items = useMemo(
-    () =>
+  const items = useMemo(() => {
+    const byCategory =
       filter === "all"
         ? MENU_ITEMS
-        : MENU_ITEMS.filter((item) => ITEM_CATEGORY[item.id] === filter),
-    [filter],
-  );
+        : MENU_ITEMS.filter((item) => ITEM_CATEGORY[item.id] === filter);
+    if (!showSearch) return byCategory;
+
+    const text = query.trim().toLowerCase();
+    const min = minPrice === "" ? 0 : Number(minPrice);
+    const max = maxPrice === "" ? Infinity : Number(maxPrice);
+    return byCategory.filter(
+      (item) =>
+        (!text || item.name.toLowerCase().includes(text)) &&
+        item.price >= min &&
+        item.price <= max,
+    );
+  }, [filter, showSearch, query, minPrice, maxPrice]);
 
   return (
     <section className="menu" id="menu">
@@ -106,6 +122,38 @@ export default function OurMenu({
         </div>
 
         <div className="menu__col">
+        {showSearch ? (
+          <div className="menu__search">
+            <input
+              type="search"
+              className="menu__search-input"
+              placeholder="Search the menu"
+              aria-label="Search the menu"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="menu__price-input"
+              placeholder="Min ₦"
+              aria-label="Minimum price"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="menu__price-input"
+              placeholder="Max ₦"
+              aria-label="Maximum price"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+            />
+          </div>
+        ) : null}
         <div className="menu__filters" role="tablist" aria-label="Menu categories">
           {FILTERS.map((f) => (
             <button
@@ -120,6 +168,10 @@ export default function OurMenu({
             </button>
           ))}
         </div>
+
+        {showSearch && items.length === 0 ? (
+          <p className="menu__no-results">No items match your search.</p>
+        ) : null}
 
         <div className="menu__cards">
           {items.map((item) => (
