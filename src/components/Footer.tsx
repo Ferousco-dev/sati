@@ -76,7 +76,7 @@ export default function Footer({
           </nav>
         </div>
 
-        <a href={content.cta_url || "/menu"} className="footer__cta" data-magnetic>
+        {/* <a href={content.cta_url || "/menu"} className="footer__cta" data-magnetic>
           <span>{content.cta_label}</span>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
@@ -87,7 +87,7 @@ export default function Footer({
               strokeLinejoin="round"
             />
           </svg>
-        </a>
+        </a> */}
         <div className="footer__bottom">
           <span>
             © {new Date().getFullYear()} {store.name}. All rights reserved.

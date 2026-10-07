@@ -67,7 +67,7 @@ export default function Catering({ content, store }: { content: CateringContent;
           {content.banner_note ? <p className="catering__banner-note">{content.banner_note}</p> : null}
         </div>
 
-        <div className="catering__copy" data-reveal>
+        <div className="catering__copy" id="catering" data-reveal>
           <h2 className="catering__title">
             {wing}
             <span>{content.heading}</span>

@@ -86,9 +86,11 @@ export const defaultContent: SiteContent = {
   navigation: {
     logo_alt: "SATI-L Yoghurt & Confectionery",
     links: [
-      { label: "Our Brand", url: "/#brand" },
-      { label: "Stores", url: "/#stores" },
-      { label: "Our Menu", url: "/menu" },
+      // { label: "Home", url: "/" },
+      { label: "Menu", url: "/menu" },
+      // { label: "Favourites", url: "/#brand" },
+      // { label: "Catering", url: "/#catering" },
+      { label: "Find Us", url: "/#stores" },
       { label: "My Orders", url: "/account" },
     ],
     order_label: "Order Now",
