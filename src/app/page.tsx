@@ -3,7 +3,6 @@ import Hero from "@/components/Hero";
 import ProductShowcase from "@/components/ProductShowcase";
 import Catering from "@/components/Catering";
 import OurMenu from "@/components/OurMenu";
-import Testimonials from "@/components/Testimonials";
 import GalleryStrip from "@/components/GalleryStrip";
 import SiteFooter from "@/components/SiteFooter";
 import AnnouncementBar from "@/components/AnnouncementBar";
@@ -23,7 +22,6 @@ export default async function Home() {
       <ProductShowcase />
       <Catering content={content.catering} store={store} />
       <OurMenu />
-      <Testimonials content={content.testimonials} />
       <GalleryStrip content={content.gallery} />
       <SiteFooter />
     </>

@@ -149,7 +149,7 @@ The API accepts requests from `http://localhost:3000` and `http://localhost:8000
 
 ## Landing page content
 
-The landing page keeps its original order: hero, product showcase, catering, menu, then testimonials and a gallery strip (both hidden until the admin adds some), and the footer, which is unchanged. The hero, catering, testimonials, gallery, the top announcement bar and the page title come from the API (`GET /api/v1/content`), and the map comes from `GET /api/v1/store`. The pages refresh from the API every minute, and if the API is down they fall back to built-in defaults in `src/lib/content/defaults.ts`.
+The landing page keeps its original order: hero, product showcase, catering, menu, then a gallery strip (hidden until the admin adds pictures), and the footer, which is unchanged. The hero, catering, gallery, the top announcement bar and the page title come from the API (`GET /api/v1/content`), and the map comes from `GET /api/v1/store`. The pages refresh from the API every minute, and if the API is down they fall back to built-in defaults in `src/lib/content/defaults.ts`.
 
 On a phone two floating buttons sit at the bottom right: WhatsApp, and under it a cart button that opens the cart, or the menu when the cart is empty. The WhatsApp button only appears once a WhatsApp number is set in the store settings.
 
