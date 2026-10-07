@@ -1,0 +1,64 @@
+:root {
+  --primary: #268adc;
+  --primary-hover: #1976c5;
+  --primary-rgb: 38, 138, 220;
+  --cta: #0f3b63;
+  --cta-hover: #164e82;
+  --cta-rgb: 15, 59, 99;
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --heading: #0f172a;
+  --heading-rgb: 15, 23, 42;
+  --body: #475569;
+  --muted: #64748b;
+  --highlight: #fbbf24;
+  --border: #e2e8f0;
+
+  /* Legacy aliases keep existing component styles on the shared palette. */
+  --green: var(--primary);
+  --dark-green: var(--primary-hover);
+  --orange: var(--primary);
+  --dark-orange: var(--primary-hover);
+  --cream: var(--background);
+  --black: var(--heading);
+  --dark-grey: var(--body);
+  --grey: var(--border);
+  --white: var(--surface);
+  --purple: var(--primary);
+  --dark-purple: var(--primary-hover);
+  --pink: var(--primary-hover);
+  --blue: var(--primary);
+  --yellow: var(--highlight);
+
+  --font-display: "Vanguard", "Arial Narrow", Arial, sans-serif;
+  --font-body: "Instrument Sans", Arial, sans-serif;
+  --font-script: "Permanent Marker", "Comic Sans MS", cursive;
+
+  --nav-height: 5.625rem;
+  --container-max: 112.938rem;
+  --page-gutter: 2.5rem;
+
+  --section-pad: 6rem;
+  --section-gap: 3rem;
+  --block-gap: 1.75rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 991px) {
+  :root {
+    --nav-height: 4.375rem;
+    --page-gutter: 1.25rem;
+    --section-pad: 4rem;
+    --section-gap: 2.25rem;
+    --block-gap: 1.25rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --nav-height: 4.2rem;
+    --page-gutter: 1rem;
+    --section-pad: 3rem;
+  }
+}

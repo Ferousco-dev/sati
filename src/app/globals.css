@@ -1,0 +1,152 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+[id] {
+  scroll-margin-top: calc(var(--nav-height) + 1rem);
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--heading);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.split-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.split-word {
+  display: inline-block;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Remove the mobile blue tap flash and the click/focus outline on buttons & links */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus,
+button:focus-visible,
+a:focus,
+a:focus-visible {
+  outline: none;
+}
+
+.button {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.563rem 0.5rem 0.563rem 1.5rem;
+  border: 0.0625rem solid rgba(255, 255, 255, 0.4);
+  border-radius: 3.563rem;
+  background-color: var(--white);
+  color: var(--black);
+  font-weight: 600;
+  font-size: max(14px, 1rem);
+  overflow: hidden;
+  transition: background-color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.button__text {
+  position: relative;
+  z-index: 10;
+  transition: color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.button__icon {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 100%;
+  background-color: var(--purple);
+  color: var(--white);
+  flex: none;
+}
+
+.button__icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.button__inner {
+  position: absolute;
+  inset: auto 0 -1%;
+  height: 101%;
+  background-color: var(--purple);
+  transform: translateY(100%);
+  transition: transform 0.5s;
+}
+
+.button:hover .button__inner {
+  transform: translateY(0);
+}
+
+.button:hover .button__text {
+  color: var(--white);
+}

@@ -1,0 +1,252 @@
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.drawer.is-open {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.drawer__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--heading-rgb), 0.5);
+  opacity: 0;
+  transition: opacity 0.4s var(--ease-out);
+}
+
+.drawer.is-open .drawer__scrim {
+  opacity: 1;
+}
+
+.drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(28rem, 100vw);
+  height: 100%;
+  background: var(--cream);
+  box-shadow: -1rem 0 3rem rgba(var(--heading-rgb), 0.18);
+  transform: translateX(100%);
+  transition: transform 0.5s var(--ease-out);
+}
+
+.drawer.is-open .drawer__panel {
+  transform: translateX(0);
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(var(--heading-rgb), 0.12);
+}
+
+.drawer__title {
+  font-size: 1.5rem;
+}
+
+.drawer__title span {
+  color: var(--orange);
+}
+
+.drawer__close {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 100%;
+  background: rgba(var(--heading-rgb), 0.06);
+  color: var(--black);
+}
+
+.drawer__close svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.drawer__close:hover {
+  background: rgba(var(--heading-rgb), 0.12);
+}
+
+.drawer__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--dark-grey);
+}
+
+.drawer__empty p {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.drawer__empty span {
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+
+.drawer__browse {
+  margin-top: 1.25rem;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 3rem;
+  background: var(--orange);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 1rem;
+  transition: background-color 0.3s var(--ease-out);
+}
+
+.drawer__browse:hover {
+  background: var(--dark-orange);
+}
+
+.drawer__list {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  overflow-y: auto;
+}
+
+.drawer-line {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(var(--heading-rgb), 0.1);
+}
+
+.drawer-line__img {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: 0.6rem;
+}
+
+.drawer-line__name {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.drawer-line__price {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--dark-grey);
+  font-size: 0.9rem;
+}
+
+.drawer-line__qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.drawer-line__qty button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 100%;
+  background: var(--white);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.drawer-line__qty button:hover {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.drawer-line__qty span {
+  min-width: 1.2rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.drawer-line__remove {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--dark-grey);
+  font-size: 0.82rem;
+  text-decoration: underline;
+}
+
+.drawer-line__remove:hover {
+  color: var(--dark-orange);
+}
+
+.drawer__foot {
+  padding: 1.25rem 1.5rem 1.75rem;
+  border-top: 1px solid rgba(var(--heading-rgb), 0.12);
+  background: var(--cream);
+}
+
+.drawer__total {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.drawer__checkout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.95rem;
+  border: none;
+  border-radius: 3.563rem;
+  background: var(--orange);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 1.05rem;
+  transition: background-color 0.3s var(--ease-out);
+}
+
+.drawer__checkout svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.drawer__checkout:hover:not(:disabled) {
+  background: var(--dark-orange);
+}
+
+.drawer__checkout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.drawer__continue {
+  width: 100%;
+  padding: 0.95rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 3.563rem;
+  background: var(--white);
+  color: var(--black);
+  font-weight: 700;
+  font-size: 1.05rem;
+  transition: background-color 0.3s var(--ease-out);
+}
+
+.drawer__continue:hover {
+  background: rgba(var(--heading-rgb), 0.06);
+}

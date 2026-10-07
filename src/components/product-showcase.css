@@ -1,0 +1,251 @@
+.showcase {
+  padding: var(--section-pad) 0;
+}
+
+.showcase__list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 1.75rem;
+  padding: 0 var(--page-gutter);
+}
+
+.card {
+  position: relative;
+  min-width: 0;
+  transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.card__img-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 25.313rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.card__img-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(160deg, var(--cta), var(--cta-hover)),
+    url("/images/products/card-bg.webp") center / cover;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.card.is-active .card__img-wrap::before {
+  opacity: 1;
+}
+
+.card__header {
+  position: relative;
+  z-index: 10;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.card__header h2 {
+  font-family: var(--font-display);
+  font-size: 2.38rem;
+  font-weight: 700;
+  transition:
+    color 0.4s,
+    transform 0.4s;
+}
+
+.card__text {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.card__text-row {
+  display: flex;
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 8rem;
+  font-weight: 700;
+  line-height: 0.85;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.16);
+  opacity: 0;
+  transition:
+    opacity 0.5s,
+    margin 0.5s;
+}
+
+.card__text-row.is-left {
+  margin-left: -4rem;
+}
+
+.card__text-row span {
+  padding-right: 0.5em;
+}
+
+.card.is-active .card__text-row {
+  opacity: 1;
+}
+
+.card.is-active .card__text-row.is-right {
+  margin-left: -4rem;
+}
+
+.card.is-active .card__text-row.is-left {
+  margin-left: 0;
+}
+
+.card__img {
+  position: relative;
+  z-index: 10;
+  width: 86%;
+  height: 72%;
+  margin-top: auto;
+  margin-bottom: 1.25rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  transition: transform 0.5s;
+}
+
+.card.is-active .card__img {
+  mix-blend-mode: normal;
+  transform: scale(1.12) translateY(-1rem);
+}
+
+.card__tag {
+  position: absolute;
+  inset: 0 -1rem auto auto;
+  z-index: 13;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.625rem 0.875rem;
+  background-color: var(--green);
+  color: var(--white);
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: -1px 4px 6.2px rgba(0, 0, 0, 0.25);
+  transform: rotate(-8deg) translateY(-0.5rem);
+  opacity: 0;
+  transition:
+    transform 0.5s,
+    opacity 0.5s;
+}
+
+.card__tag svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.card.is-active .card__header h2 {
+  color: var(--white);
+  transform: scale(1.2);
+}
+
+.card.is-active .card__tag {
+  opacity: 1;
+  transform: rotate(-8deg) translateY(0);
+}
+
+.showcase__marquee {
+  display: block;
+  margin-top: var(--section-gap);
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--grey);
+  border-bottom: 1px solid var(--grey);
+  overflow: hidden;
+}
+
+.showcase__marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 2rem;
+  animation: marquee 30s linear infinite;
+}
+
+.showcase__marquee-item {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.showcase__marquee-item svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 991px) {
+  .showcase {
+    padding-top: 3rem;
+  }
+
+  .showcase__list {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0 var(--page-gutter) 0.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .showcase__list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .card {
+    flex: 0 0 80%;
+    scroll-snap-align: center;
+  }
+
+  .card__img-wrap {
+    height: 22rem;
+  }
+
+  .card__img-wrap::before {
+    opacity: 1;
+  }
+
+  .card__header h2 {
+    color: var(--white);
+    font-size: 1.75rem;
+  }
+
+  .card__text-row {
+    font-size: 5rem;
+    opacity: 1;
+  }
+
+  .card__img {
+    transform: scale(1.15) translateY(-1rem);
+  }
+
+  .card__tag {
+    opacity: 1;
+    transform: rotate(-8deg);
+  }
+
+  .showcase__marquee-item {
+    font-size: 2.25rem;
+  }
+}
