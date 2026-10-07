@@ -179,6 +179,8 @@ func (h *Handler) Mount(mux router.Mux, access auth.Access) {
 	mux.Handle("GET /api/v1/admin/payments", access.Staff(http.HandlerFunc(h.list)))
 	mux.Handle("POST /api/v1/admin/payments/{id}/refunded", access.Admin(http.HandlerFunc(h.refunded)))
 
+	mux.Handle("GET /api/v1/payments", access.Customer(http.HandlerFunc(h.myPayments)))
+
 	if h.svc == nil {
 		return
 	}

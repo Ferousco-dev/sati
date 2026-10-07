@@ -492,3 +492,88 @@ func TestOnlineHiddenUntilGatewayConfigured(t *testing.T) {
 		t.Fatal("an online order was accepted without a gateway")
 	}
 }
+
+func TestMyPaymentsHistory(t *testing.T) {
+	e := newStaffEnv(t)
+	e.settings(t, map[string]any{"bank_name": "B", "bank_account_number": "1234567890", "bank_account_name": "N"})
+	other := e.signIn(t, "other@example.com", "CUSTOMER")
+
+	paidOnline := e.onlineOrder(t)
+	pay := e.startPayment(t, e.customer, paidOnline.ID)
+	e.paystack.set(pay.Reference, "success", paidOnline.TotalKobo)
+	e.verifyPayment(t, e.customer, pay.Reference)
+
+	abandoned := e.onlineOrder(t)
+	e.startPayment(t, e.customer, abandoned.ID)
+
+	transfer := e.place(t, "PICKUP", "BANK_TRANSFER")
+	e.do(t, "POST", "/api/v1/admin/orders/"+transfer.ID+"/payment", map[string]any{}, e.staff)
+	e.setStatus(t, transfer.ID, "CANCELLED", "Kitchen closed")
+
+	cash := e.place(t, "PICKUP", "PAY_ON_PICKUP")
+	for _, st := range []string{"CONFIRMED", "PREPARING", "READY", "COMPLETED"} {
+		e.mustSetStatus(t, cash.ID, st)
+	}
+
+	type history struct {
+		Payments []payments.CustomerPayment `json:"payments"`
+		Total    int
+		Summary  payments.Summary
+	}
+	got := decode[history](t, e.do(t, "GET", "/api/v1/payments", nil, e.customer))
+	if got.Total != 4 {
+		t.Fatalf("expected 4 payments (online paid, abandoned attempt, transfer, cash), got %d", got.Total)
+	}
+	for _, p := range got.Payments {
+		if p.OrderNumber == "" || p.Currency != "NGN" || p.Method == "" {
+			t.Fatalf("incomplete entry: %+v", p)
+		}
+	}
+	if got.Summary.PaidKobo != paidOnline.TotalKobo+cash.TotalKobo || got.Summary.RefundPendingKobo != transfer.TotalKobo || got.Summary.RefundedKobo != 0 {
+		t.Fatalf("summary: %+v", got.Summary)
+	}
+	refundPending := 0
+	for _, p := range got.Payments {
+		if p.RefundPending {
+			refundPending++
+		}
+	}
+	if refundPending != 1 {
+		t.Fatalf("one payment is waiting for a refund, got %d", refundPending)
+	}
+
+	paid := decode[history](t, e.do(t, "GET", "/api/v1/payments?status=PAID&limit=1", nil, e.customer))
+	if paid.Total != 3 || len(paid.Payments) != 1 {
+		t.Fatalf("filter and paging: %+v", paid)
+	}
+
+	if mine := decode[history](t, e.do(t, "GET", "/api/v1/payments", nil, other)); mine.Total != 0 || mine.Summary.PaidKobo != 0 {
+		t.Fatalf("another customer's payments leaked: %+v", mine)
+	}
+	if rec := e.do(t, "GET", "/api/v1/payments", nil, nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous: %d", rec.Code)
+	}
+	if rec := e.do(t, "GET", "/api/v1/payments?status=NOPE", nil, e.customer); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad filter: %d", rec.Code)
+	}
+
+	e.markFirstRefundable(t)
+	after := decode[history](t, e.do(t, "GET", "/api/v1/payments", nil, e.customer))
+	if after.Summary.RefundedKobo != transfer.TotalKobo || after.Summary.RefundPendingKobo != 0 {
+		t.Fatalf("after the refund is recorded: %+v", after.Summary)
+	}
+	if got := e.do(t, "GET", "/api/v1/payments", nil, e.customer).Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("payment history must not be cached: %q", got)
+	}
+}
+
+func (e *staffEnv) markFirstRefundable(t *testing.T) {
+	t.Helper()
+	var id string
+	if err := e.queryRow(`SELECT id::text FROM payments WHERE needs_refund AND status = 'PAID' LIMIT 1`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if rec := e.do(t, "POST", "/api/v1/admin/payments/"+id+"/refunded", map[string]any{"note": "refunded"}, e.admin); rec.Code != http.StatusNoContent {
+		t.Fatalf("refund: %d", rec.Code)
+	}
+}

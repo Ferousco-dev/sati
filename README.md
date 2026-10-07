@@ -599,6 +599,7 @@ The backend verifies the transaction with Paystack before marking the payment as
 
 | Route                              | What it does                                         |
 | ---------------------------------- | ---------------------------------------------------- |
+| `GET /api/v1/payments`             | The customer's payment history, with totals paid, refunded and waiting for refund. Filter with `?status=`. |
 | `POST /api/v1/payments/initialize` | Initializes a payment for an eligible order.         |
 | `GET /api/v1/payments/:reference`  | Returns payment information for an authorized order. |
 | `POST /api/v1/payments/verify`     | Verifies a payment with the payment provider.        |
