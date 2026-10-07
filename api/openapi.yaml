@@ -713,6 +713,17 @@ paths:
             schema:
               type: object
               properties:
+                store_name: {type: string}
+                store_address: {type: string}
+                store_phone: {type: string}
+                store_email: {type: string}
+                instagram_url: {type: string}
+                tiktok_url: {type: string}
+                facebook_url: {type: string}
+                map_embed_url: {type: string}
+                opening_hours: {description: "object with mon..sun, each {open, close} as HH:MM or null"}
+                temporarily_closed: {type: boolean}
+                closed_message: {type: string}
                 delivery_fee_kobo: {type: integer}
                 online_enabled: {type: boolean}
                 bank_transfer_enabled: {type: boolean}
@@ -1305,6 +1316,16 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/store:
+    get:
+      tags: ["Operations"]
+      summary: "Public store details: name, contact, WhatsApp, social links, map, opening hours and whether the store is open now. Cached."
+      x-access: public
+      security: []
+      responses:
+        '200':
+          description: Success.
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /api/v1/webhooks/paystack:
     post:

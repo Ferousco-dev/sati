@@ -92,7 +92,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	}
 	if _, err := pool.Exec(context.Background(), `UPDATE store_settings SET delivery_fee_kobo = 0, online_enabled = TRUE,
 		bank_transfer_enabled = TRUE, pay_on_pickup_enabled = TRUE, pay_on_delivery_enabled = TRUE,
-		bank_name = '', bank_account_number = '', bank_account_name = '', whatsapp_number = '', notification_email = ''`); err != nil {
+		bank_name = '', bank_account_number = '', bank_account_name = '', whatsapp_number = '', notification_email = '', store_name = 'SATI-L Yoghurt & Confectionery', store_address = '', store_phone = '', store_email = '', instagram_url = '', tiktok_url = '', facebook_url = '', map_embed_url = '', opening_hours = '{}', temporarily_closed = FALSE, closed_message = ''`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,7 +126,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
 		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
-		Store:         store.NewHandler(pool, log),
+		Store:         store.NewHandler(pool, log).WithLocation(lagos),
 		Payments:      payments.NewHandler(pool, log).WithService(orderSvc),
 		Analytics:     analytics.NewHandler(analytics.NewService(pool, lagos), log),
 		Zones:         delivery.NewZoneHandler(pool, log),

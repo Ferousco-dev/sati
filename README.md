@@ -436,6 +436,12 @@ The customer pays to the account using the order number as the reference. The fr
 
 Cash and bank transfer orders stay `PENDING` and `UNPAID` until staff confirm them and record the payment.
 
+### Public store information
+
+`GET /api/v1/store` is public and cached. It returns the name, address, phone, email, WhatsApp number and link, social links, map link, opening hours, the store timezone, and whether the store is open now (`open_now`, with `next_change` and `next_change_at` saying when it opens or closes next). The bank account, the notification email and the payment switches are never included.
+
+Opening hours are read in the store timezone, so a store that closes at 21:00 is closed at 21:00 in Lagos whatever the visitor's clock says. The schedule does not block orders: checkout stays open and the website decides what to show when the store is closed.
+
 ### Store settings
 
 Everything below is changed through the admin API, with no code edits: `GET /api/v1/admin/settings` (STAFF and ADMIN) and `PATCH /api/v1/admin/settings` (ADMIN).
@@ -447,6 +453,11 @@ Everything below is changed through the admin API, with no code edits: `GET /api
 | `bank_name`, `bank_account_number`, `bank_account_name` | The store's bank account. Bank transfer is only offered once all three are set. |
 | `whatsapp_number` | International number, digits only (a leading `+` and spaces are accepted). |
 | `whatsapp_message` | Message template. `{order_number}` and `{total}` are replaced. |
+| `store_name`, `store_address`, `store_phone`, `store_email` | Public contact details. |
+| `instagram_url`, `tiktok_url`, `facebook_url` | Social links. Each must be an `https` link on its own site. |
+| `map_embed_url` | The map shown on the website, an `https` embed link on google.com or openstreetmap.org. |
+| `opening_hours` | Weekly schedule: `mon` to `sun`, each `{"open":"09:00","close":"21:00"}` or `null` for closed. Sending it replaces the whole schedule. |
+| `temporarily_closed`, `closed_message` | A manual switch that overrides the schedule, and the message to show. |
 
 Orders using a method that is switched off are rejected with `PAYMENT_METHOD_DISABLED`. Turn `online_enabled` off until Paystack is connected.
 

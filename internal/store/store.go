@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
@@ -34,6 +35,17 @@ type Settings struct {
 	WhatsAppNumber       string    `json:"whatsapp_number"`
 	WhatsAppMessage      string    `json:"whatsapp_message"`
 	NotificationEmail    string    `json:"notification_email"`
+	StoreName            string    `json:"store_name"`
+	StoreAddress         string    `json:"store_address"`
+	StorePhone           string    `json:"store_phone"`
+	StoreEmail           string    `json:"store_email"`
+	InstagramURL         string    `json:"instagram_url"`
+	TikTokURL            string    `json:"tiktok_url"`
+	FacebookURL          string    `json:"facebook_url"`
+	MapEmbedURL          string    `json:"map_embed_url"`
+	OpeningHours         Hours     `json:"opening_hours"`
+	TemporarilyClosed    bool      `json:"temporarily_closed"`
+	ClosedMessage        string    `json:"closed_message"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
@@ -49,6 +61,17 @@ type UpdateInput struct {
 	WhatsAppNumber       *string `json:"whatsapp_number"`
 	WhatsAppMessage      *string `json:"whatsapp_message"`
 	NotificationEmail    *string `json:"notification_email"`
+	StoreName            *string `json:"store_name"`
+	StoreAddress         *string `json:"store_address"`
+	StorePhone           *string `json:"store_phone"`
+	StoreEmail           *string `json:"store_email"`
+	InstagramURL         *string `json:"instagram_url"`
+	TikTokURL            *string `json:"tiktok_url"`
+	FacebookURL          *string `json:"facebook_url"`
+	MapEmbedURL          *string `json:"map_embed_url"`
+	OpeningHours         *Hours  `json:"opening_hours"`
+	TemporarilyClosed    *bool   `json:"temporarily_closed"`
+	ClosedMessage        *string `json:"closed_message"`
 }
 
 func (s Settings) BankTransferReady() bool {
@@ -57,7 +80,8 @@ func (s Settings) BankTransferReady() bool {
 
 const columns = `delivery_fee_kobo, online_enabled, bank_transfer_enabled, pay_on_pickup_enabled,
 	pay_on_delivery_enabled, bank_name, bank_account_number, bank_account_name,
-	whatsapp_number, whatsapp_message, notification_email, updated_at`
+	whatsapp_number, whatsapp_message, notification_email, store_name, store_address, store_phone, store_email,
+	instagram_url, tiktok_url, facebook_url, map_embed_url, opening_hours, temporarily_closed, closed_message, updated_at`
 
 type Repository struct{}
 
@@ -69,10 +93,23 @@ func (Repository) Get(ctx context.Context, db database.DBTX) (Settings, error) {
 
 func scan(row interface{ Scan(...any) error }) (Settings, error) {
 	var s Settings
+	var hours []byte
 	err := row.Scan(&s.DeliveryFeeKobo, &s.OnlineEnabled, &s.BankTransferEnabled, &s.PayOnPickupEnabled,
 		&s.PayOnDeliveryEnabled, &s.BankName, &s.BankAccountNumber, &s.BankAccountName,
-		&s.WhatsAppNumber, &s.WhatsAppMessage, &s.NotificationEmail, &s.UpdatedAt)
-	return s, err
+		&s.WhatsAppNumber, &s.WhatsAppMessage, &s.NotificationEmail, &s.StoreName, &s.StoreAddress,
+		&s.StorePhone, &s.StoreEmail, &s.InstagramURL, &s.TikTokURL, &s.FacebookURL, &s.MapEmbedURL,
+		&hours, &s.TemporarilyClosed, &s.ClosedMessage, &s.UpdatedAt)
+	if err != nil {
+		return s, err
+	}
+	s.OpeningHours = Hours{}
+	if len(hours) > 0 {
+		if err := json.Unmarshal(hours, &s.OpeningHours); err != nil {
+			return s, err
+		}
+	}
+	s.OpeningHours = s.OpeningHours.Normalize()
+	return s, nil
 }
 
 func (Repository) Update(ctx context.Context, db database.DBTX, in UpdateInput, now time.Time) (Settings, error) {
@@ -89,11 +126,24 @@ func (Repository) Update(ctx context.Context, db database.DBTX, in UpdateInput, 
 		   whatsapp_number = COALESCE($9, whatsapp_number),
 		   whatsapp_message = COALESCE($10, whatsapp_message),
 		   notification_email = COALESCE($11, notification_email),
-		   updated_at = $12
+		   store_name = COALESCE($12, store_name),
+		   store_address = COALESCE($13, store_address),
+		   store_phone = COALESCE($14, store_phone),
+		   store_email = COALESCE($15, store_email),
+		   instagram_url = COALESCE($16, instagram_url),
+		   tiktok_url = COALESCE($17, tiktok_url),
+		   facebook_url = COALESCE($18, facebook_url),
+		   map_embed_url = COALESCE($19, map_embed_url),
+		   opening_hours = COALESCE($20::jsonb, opening_hours),
+		   temporarily_closed = COALESCE($21, temporarily_closed),
+		   closed_message = COALESCE($22, closed_message),
+		   updated_at = $23
 		 RETURNING `+columns,
 		in.DeliveryFeeKobo, in.OnlineEnabled, in.BankTransferEnabled, in.PayOnPickupEnabled,
 		in.PayOnDeliveryEnabled, in.BankName, in.BankAccountNumber, in.BankAccountName,
-		in.WhatsAppNumber, in.WhatsAppMessage, in.NotificationEmail, now))
+		in.WhatsAppNumber, in.WhatsAppMessage, in.NotificationEmail, in.StoreName, in.StoreAddress,
+		in.StorePhone, in.StoreEmail, in.InstagramURL, in.TikTokURL, in.FacebookURL, in.MapEmbedURL,
+		hoursJSON(in.OpeningHours), in.TemporarilyClosed, in.ClosedMessage, now))
 }
 
 type Handler struct {
@@ -101,13 +151,22 @@ type Handler struct {
 	repo *Repository
 	log  *slog.Logger
 	now  func() time.Time
+	loc  *time.Location
 }
 
 func NewHandler(pool *pgxpool.Pool, log *slog.Logger) *Handler {
-	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now}
+	return &Handler{pool: pool, repo: NewRepository(), log: log, now: time.Now, loc: time.UTC}
+}
+
+// WithLocation sets the store timezone used to decide whether the store is open.
+func (h *Handler) WithLocation(loc *time.Location) *Handler {
+	h.loc = loc
+	return h
 }
 
 func (h *Handler) Mount(mux router.Mux, access auth.Access) {
+	cached := middleware.PublicCache(time.Minute, 5*time.Minute)
+	mux.Handle("GET /api/v1/store", cached(http.HandlerFunc(h.public)))
 	mux.Handle("GET /api/v1/admin/settings", access.Staff(http.HandlerFunc(h.get)))
 	mux.Handle("PATCH /api/v1/admin/settings", access.Admin(http.HandlerFunc(h.update)))
 }
@@ -140,7 +199,7 @@ func (in *UpdateInput) normalize() *apierror.Error {
 	if in.DeliveryFeeKobo == nil && in.OnlineEnabled == nil && in.BankTransferEnabled == nil &&
 		in.PayOnPickupEnabled == nil && in.PayOnDeliveryEnabled == nil && in.BankName == nil &&
 		in.BankAccountNumber == nil && in.BankAccountName == nil && in.WhatsAppNumber == nil &&
-		in.WhatsAppMessage == nil && in.NotificationEmail == nil {
+		in.WhatsAppMessage == nil && in.NotificationEmail == nil && !in.hasInfoFields() {
 		return validation("No fields to update")
 	}
 	if in.DeliveryFeeKobo != nil && (*in.DeliveryFeeKobo < 0 || *in.DeliveryFeeKobo > maxDeliveryFeeKobo) {
@@ -189,7 +248,7 @@ func (in *UpdateInput) normalize() *apierror.Error {
 		}
 		in.NotificationEmail = &addr
 	}
-	return nil
+	return in.normalizeInfo()
 }
 
 // digitsOnly keeps the digits of a number, ignoring spaces, dashes and

@@ -115,7 +115,7 @@ func run() error {
 		Addresses:     addresses.NewHandler(addresses.NewService(pool), log),
 		Orders:        orders.NewHandler(orderSvc, log),
 		Notifications: notifications.NewHandler(pool, log),
-		Store:         store.NewHandler(pool, log),
+		Store:         store.NewHandler(pool, log).WithLocation(storeLocation),
 		Payments:      payments.NewHandler(pool, log),
 		Analytics:     analytics.NewHandler(analytics.NewService(pool, storeLocation), log),
 		Zones:         delivery.NewZoneHandler(pool, log),
