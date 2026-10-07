@@ -6,8 +6,10 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
+import { optionalStorage, useConsent } from "./consent";
 
 export type MenuItem = {
   id: string;
@@ -46,7 +48,9 @@ type Action =
   | { type: "reorder"; lines: CartLine[] }
   | { type: "hydrate"; state: State };
 
-const KEY = "orente:v1";
+// Saved as "sati:v1", and only once the visitor has accepted optional storage.
+const KEY = "v1";
+const LEGACY_KEY = "orente:v1";
 const empty: State = { cart: [], account: null, orders: [] };
 
 function reducer(state: State, action: Action): State {
@@ -122,18 +126,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, empty);
   const [cartOpen, setCartOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const consent = useConsent();
+  const hydrated = useRef(false);
 
+  // The old demo stored its data under another name without asking. Remove it.
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(KEY);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch {}
+  }, []);
+
+  // Load a saved cart once, and only if the visitor already accepted storage.
+  useEffect(() => {
+    if (!consent.ready || hydrated.current) return;
+    hydrated.current = true;
+    try {
+      const raw = optionalStorage.get(KEY);
       if (raw) dispatch({ type: "hydrate", state: JSON.parse(raw) });
     } catch {}
     setReady(true);
-  }, []);
+  }, [consent.ready]);
 
+  // Without consent the cart lives in memory for this visit only.
   useEffect(() => {
-    if (ready) localStorage.setItem(KEY, JSON.stringify(state));
-  }, [state, ready]);
+    if (ready && consent.state === "accepted") {
+      optionalStorage.set(KEY, JSON.stringify(state));
+    }
+  }, [state, ready, consent.state]);
 
   const total = useMemo(
     () => state.cart.reduce((sum, l) => sum + l.price * l.qty, 0),

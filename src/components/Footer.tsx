@@ -1,5 +1,6 @@
 // @ts-ignore: CSS module import for side effects
 import "./footer.css";
+import InstallButton from "@/components/InstallButton";
 
 const columns = [
   {
@@ -48,6 +49,7 @@ export default function Footer() {
               className="footer__logo"
             />
             <p className="footer__tagline">Make you ask for more</p>
+            <InstallButton />
           </div>
 
           <nav className="footer__cols" aria-label="Footer">

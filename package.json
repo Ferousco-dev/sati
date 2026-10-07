@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "icons": "node scripts/generate-icons.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:sw": "node --test scripts/sw.test.mjs",
+    "test:lib": "node --test src/lib/api/client.test.ts",
+    "test": "npm run typecheck && npm run test:lib && npm run test:sw"
   },
   "dependencies": {
     "gsap": "^3.12.5",

@@ -3,11 +3,15 @@
 import { useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { prefersReducedMotion } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 
+
 export function useReveal() {
   useEffect(() => {
+    if (prefersReducedMotion()) return;
+
     const els = gsap.utils
       .toArray<HTMLElement>("[data-reveal]")
       .filter((el) => !el.dataset.revealed);

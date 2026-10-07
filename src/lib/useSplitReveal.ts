@@ -3,11 +3,14 @@
 import { useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { prefersReducedMotion } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export function useSplitReveal() {
   useEffect(() => {
+    if (prefersReducedMotion()) return;
+
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>("[data-split]").forEach((el) => {
         if (el.dataset.splitDone) return;

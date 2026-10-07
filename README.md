@@ -6,10 +6,10 @@ This repository is the `frontend` branch of the SATI Yoghurt remote. The API is 
 
 ## Current state
 
-The site is a working front-end demo. It is not connected to the backend yet.
+The site is a front-end demo with the foundation for the real app in place. It is not connected to the backend yet.
 
 - The menu is a static list in `src/lib/menu.ts`.
-- The cart, the "account" (a name and an email, with no password) and past orders are kept in the browser's `localStorage` under the key `orente:v1`.
+- The cart, the "account" (a name and an email, with no password) and past orders are kept only in memory until the visitor accepts optional storage, then in `localStorage` under `sati:v1`.
 - Order tracking is simulated. An order moves from placed to delivered by comparing the time it was placed with the clock (`src/lib/order-status.ts`), with a two minute timeline.
 - Copy, colours and images still carry the earlier "SATI-L Yoghurt & confectionery " branding and need to be replaced with SATI Yoghurt.
 - The fonts `Vanguard` and `Instrument Sans` are named in `src/app/tokens.css` but are not loaded yet, so the browser falls back to Arial. Only `Permanent Marker` is loaded, from Google Fonts in `src/app/layout.tsx`.
@@ -45,11 +45,14 @@ npm run start
 
 ## Scripts
 
-| Command         | What it does                           |
-| --------------- | -------------------------------------- |
-| `npm run dev`   | Starts the development server.         |
-| `npm run build` | Creates the production build.          |
-| `npm run start` | Serves the production build.           |
+| Command             | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `npm run dev`       | Starts the development server.                                       |
+| `npm run build`     | Creates the production build.                                        |
+| `npm run start`     | Serves the production build.                                         |
+| `npm run typecheck` | Checks the TypeScript.                                               |
+| `npm run test`      | Runs the type check, the API client tests and the service worker tests. |
+| `npm run icons`     | Redraws the placeholder app icons.                                   |
 
 ## Pages
 
@@ -131,13 +134,40 @@ Speed is a main goal of the project.
 
 ## Environment
 
-There are no environment variables yet. When the API is connected the app will read one:
+Copy `.env.example` to `.env.local`.
 
 ```env
+API_ORIGIN=http://localhost:8080
 NEXT_PUBLIC_API_URL=
 ```
 
-Leave it empty to call the API on the same origin through the proxy. `.env*` files are ignored by git, so nothing secret is ever committed. Anything starting with `NEXT_PUBLIC_` is visible in the browser, so never put a secret in it.
+- `API_ORIGIN` is where the Go API runs. The app passes every `/api/*` request on to it, so the browser only ever talks to one address. That keeps the session cookie working without any CORS setup. Run the API with `go run ./cmd/api` in `backend/`.
+- `NEXT_PUBLIC_API_URL` stays empty to use that same-origin setup. Only set it if the API is on a different address.
+- `.env*` files are ignored by git, except `.env.example`. Anything starting with `NEXT_PUBLIC_` is visible in the browser, so never put a secret in it.
+
+The API accepts requests from `http://localhost:3000` and `http://localhost:8000`, so use one of those addresses in development.
+
+## Installable app (PWA)
+
+The site can be installed on a phone or computer.
+
+- `src/app/manifest.ts` describes the app. The installed app opens on `/menu`, so it has no landing page. If it is ever opened at `/`, it redirects to `/menu`.
+- `public/sw.js` is the service worker. It keeps the app installable, saves pictures, icons and scripts so repeat visits are fast, and shows `public/offline.html` when a page cannot be loaded. It never touches `/api`, so nothing personal is stored on the device.
+- `src/lib/pwa.tsx` catches the browser's install prompt for the "Install app" button (`InstallButton`). iPhones cannot be prompted from code, so they are shown the Share, then Add to Home Screen steps.
+- The service worker only registers in a production build. To try it, run `npm run build` and `npm run start`, then open the site in Chrome. Browser panes that do not support service workers cannot test it.
+- The icons are placeholders: a white S on the brand blue. Replace `public/icons/*.png`, `src/app/icon.png` and `src/app/apple-icon.png` with the real logo, keeping the sizes (192, 512, a 512 maskable with the logo inside the centre 60%, and 180 for Apple).
+
+## Optional storage and consent
+
+Anything optional, such as the saved cart, is written to the device only after the visitor accepts. `src/lib/consent.tsx` holds the choice and `optionalStorage` is the only way to save optional data: it refuses to write until the choice is "accepted", and declining deletes what was saved. The session cookie is strictly necessary and does not use it. Without consent the cart lives in memory for the visit.
+
+## Talking to the API
+
+Use `api` from `src/lib/api/client.ts` for every call. It always sends cookies, turns failures into an `ApiError` with the API's stable `code`, reads `Retry-After` on a `429`, and has an `idempotencyKey` option for placing orders. `errorMessage(err)` gives a message that is safe to show. Money is whole kobo, shown with `formatKobo` from `src/lib/money.ts`.
+
+## Shared building blocks
+
+`src/components/ui` has a modal with focus handling, toasts (`useToast`), skeleton loaders, an empty state and the button styles. They use the same tokens and animation as the rest of the site, and every animation is switched off for visitors who ask for reduced motion.
 
 ## Deployment
 
