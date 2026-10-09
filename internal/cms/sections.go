@@ -489,7 +489,7 @@ var sectionDefs = []sectionDef{
 		return &Navigation{
 			LogoAlt: "SATI-L Yoghurt & Confectionery",
 			Links: []Link{
-				{"Home", "/"}, {"Menu", "/menu"}, {"Favourites", "/#brand"}, {"Catering", "/#catering"}, {"Find Us", "/#stores"}, {"My Orders", "/account"},
+				{"Menu", "/menu"}, {"Gallery", "/#gallery"}, {"Find Us", "/#stores"},
 			},
 			OrderLabel: "Order Now", CartLabel: "Cart",
 		}

@@ -70,8 +70,6 @@ func run() error {
 	notifier := notifications.NewService(cfg.FrontendURL, log)
 	mailer := notifications.NewMailer(notifier, pool)
 	recorder := audit.NewRecorder(pool, log)
-	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings())
-
 	storage, err := files.NewLocalStorage(cfg.UploadDir, cfg.AssetBaseURL)
 	if cfg.StorageDriver != "local" {
 		err = fmt.Errorf("storage driver %q is not implemented yet", cfg.StorageDriver)
@@ -79,6 +77,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	authSvc := auth.NewService(pool, mailer, log, cfg.SessionSecret, auth.DefaultSettings()).WithStorage(storage)
 
 	storeLocation, err := time.LoadLocation(cfg.StoreTimezone)
 	if err != nil {

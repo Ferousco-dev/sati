@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"io"
 	"github.com/Ferousco-dev/sati/backend/pkg/router"
 	"log/slog"
 	"math"
@@ -57,6 +58,10 @@ func (h *Handler) Mount(mux router.Mux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 	mux.Handle("GET /api/v1/auth/me", authn(http.HandlerFunc(h.me)))
+	mux.Handle("PATCH /api/v1/auth/me", authn(http.HandlerFunc(h.updateMe)))
+	mux.Handle("DELETE /api/v1/auth/me", authn(http.HandlerFunc(h.deleteMe)))
+	mux.Handle("POST /api/v1/auth/me/avatar", authn(http.HandlerFunc(h.uploadAvatar)))
+	mux.Handle("DELETE /api/v1/auth/me/avatar", authn(http.HandlerFunc(h.removeAvatar)))
 	mux.HandleFunc("POST /api/v1/auth/verify-email", h.verifyEmail)
 	mux.Handle("POST /api/v1/auth/resend-verification", authn(http.HandlerFunc(h.resendVerification)))
 	mux.HandleFunc("POST /api/v1/auth/forgot-password", h.forgotPassword)
@@ -69,6 +74,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		Email      string `json:"email"`
 		Password   string `json:"password"`
 		RememberMe bool   `json:"remember_me"`
+		Phone      string `json:"phone"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body); err != nil {
 		apierror.Write(w, err)
@@ -134,6 +140,76 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	id, _ := IdentityFrom(r.Context())
 	apierror.JSON(w, http.StatusOK, map[string]any{"user": id.User})
+}
+
+func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	var body struct {
+		Name  *string `json:"name"`
+		Phone *string `json:"phone"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	user, err := h.svc.UpdateProfile(r.Context(), id.User.ID, ProfileInput(body))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, map[string]any{"user": user})
+}
+
+func (h *Handler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	r.Body = http.MaxBytesReader(w, r.Body, AvatarMaxBytes+(1<<20))
+	file, _, err := r.FormFile("image")
+	if err != nil {
+		apierror.Write(w, validationError("A picture is required in the \"image\" field"))
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, AvatarMaxBytes+1))
+	if err != nil {
+		apierror.Write(w, validationError("Could not read the uploaded picture"))
+		return
+	}
+	user, err := h.svc.SetAvatar(r.Context(), id.User.ID, data)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, map[string]any{"user": user})
+}
+
+func (h *Handler) removeAvatar(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	user, err := h.svc.RemoveAvatar(r.Context(), id.User.ID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	apierror.JSON(w, http.StatusOK, map[string]any{"user": user})
+}
+
+// deleteMe closes the signed-in customer's account after they confirm with their password.
+func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
+	id, _ := IdentityFrom(r.Context())
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body); err != nil {
+		apierror.Write(w, err)
+		return
+	}
+	if err := h.svc.DeleteAccount(r.Context(), id.User.ID, body.Password); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.recordLogin(r, "auth.account_deleted", id.User.ID, string(id.User.Role), map[string]any{"email": id.User.Email})
+	h.clearCookie(w)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {

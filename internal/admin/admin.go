@@ -103,13 +103,16 @@ func (s *Service) ChangeRole(ctx context.Context, actorID, targetID string, role
 }
 
 type Customer struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Email          string    `json:"email"`
-	EmailVerified  bool      `json:"email_verified"`
-	OrdersCount    int       `json:"orders_count"`
-	TotalSpentKobo int64     `json:"total_spent_kobo"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Phone         string `json:"phone"`
+	// DeletedAt is set when the customer deleted their account. The row is kept until a developer clears it.
+	DeletedAt      *time.Time `json:"deleted_at"`
+	OrdersCount    int        `json:"orders_count"`
+	TotalSpentKobo int64      `json:"total_spent_kobo"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type CustomerPage struct {
@@ -136,7 +139,7 @@ func (s *Service) ListCustomers(ctx context.Context, query string, limit, offset
 	}
 
 	rows, err := s.pool.Query(ctx,
-		`SELECT u.id::text, u.name, u.email::text, u.email_verified, u.created_at,
+		`SELECT u.id::text, u.name, u.email::text, u.email_verified, u.created_at, u.phone, u.deleted_at,
 		        count(o.id), COALESCE(sum(o.total_kobo) FILTER (WHERE o.payment_status = 'PAID'), 0)
 		 FROM users u LEFT JOIN orders o ON o.customer_id = u.id
 		 WHERE `+where+` GROUP BY u.id ORDER BY u.created_at DESC, u.id LIMIT $2 OFFSET $3`, pattern, limit, offset)
@@ -147,7 +150,7 @@ func (s *Service) ListCustomers(ctx context.Context, query string, limit, offset
 
 	for rows.Next() {
 		var c Customer
-		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.EmailVerified, &c.CreatedAt, &c.OrdersCount, &c.TotalSpentKobo); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Email, &c.EmailVerified, &c.CreatedAt, &c.Phone, &c.DeletedAt, &c.OrdersCount, &c.TotalSpentKobo); err != nil {
 			return CustomerPage{}, err
 		}
 		page.Customers = append(page.Customers, c)

@@ -42,11 +42,11 @@ func (store) sessionByHash(ctx context.Context, db database.DBTX, hash []byte, n
 	var s sessionRow
 	err := db.QueryRow(ctx,
 		`SELECT s.id::text, s.remember_me, s.expires_at, s.last_used_at,
-		        u.id::text, u.name, u.email::text, u.role::text, u.email_verified, u.created_at
+		        u.id::text, u.name, u.email::text, u.role::text, u.email_verified, u.created_at, u.phone, u.avatar_key
 		 FROM sessions s JOIN users u ON u.id = s.user_id
-		 WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2`,
+		 WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2 AND u.deleted_at IS NULL`,
 		hash, now).Scan(&s.ID, &s.RememberMe, &s.ExpiresAt, &s.LastUsedAt,
-		&s.User.ID, &s.User.Name, &s.User.Email, &s.User.Role, &s.User.EmailVerified, &s.User.CreatedAt)
+		&s.User.ID, &s.User.Name, &s.User.Email, &s.User.Role, &s.User.EmailVerified, &s.User.CreatedAt, &s.User.Phone, &s.User.AvatarKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sessionRow{}, errNoRow
 	}
@@ -98,4 +98,14 @@ func (store) consumeToken(ctx context.Context, db database.DBTX, table tokenTabl
 		return "", errNoRow
 	}
 	return userID, err
+}
+
+// clearTokens drops any unused verification and reset links, so nothing can reopen a deleted account.
+func (store) clearTokens(ctx context.Context, db database.DBTX, userID string) error {
+	for _, table := range []tokenTable{verificationTokens, resetTokens} {
+		if _, err := db.Exec(ctx, `DELETE FROM `+string(table)+` WHERE user_id = $1 AND used_at IS NULL`, userID); err != nil {
+			return err
+		}
+	}
+	return nil
 }

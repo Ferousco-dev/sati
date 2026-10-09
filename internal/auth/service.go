@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -13,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Ferousco-dev/sati/backend/internal/files"
 	"github.com/Ferousco-dev/sati/backend/internal/users"
 	"github.com/Ferousco-dev/sati/backend/pkg/apierror"
 	"github.com/Ferousco-dev/sati/backend/pkg/database"
@@ -24,7 +28,19 @@ var (
 	ErrEmailTaken         = apierror.New(http.StatusConflict, "EMAIL_TAKEN", "An account with this email already exists")
 	ErrResendTooSoon      = apierror.New(http.StatusTooManyRequests, "RESEND_TOO_SOON", "Please wait before requesting another email")
 	ErrAlreadyVerified    = apierror.New(http.StatusConflict, "ALREADY_VERIFIED", "Email is already verified")
+	ErrAccountDeleted     = apierror.New(http.StatusForbidden, "ACCOUNT_DELETED", "This account was deleted. To use it again, email our support team.")
+	ErrWrongPassword      = apierror.New(http.StatusBadRequest, "INVALID_PASSWORD", "That password is not correct")
+	ErrNotCustomer        = apierror.New(http.StatusForbidden, "NOT_A_CUSTOMER_ACCOUNT", "Staff accounts are managed by an administrator")
 )
+
+// AvatarMaxBytes caps a profile picture. Pictures are small, so this is generous.
+const AvatarMaxBytes = 2 << 20
+
+var avatarTypes = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/webp": ".webp",
+}
 
 type Mailer interface {
 	SendVerification(ctx context.Context, name, email, token string) error
@@ -63,6 +79,7 @@ type Service struct {
 	log    *slog.Logger
 	set    Settings
 	now    func() time.Time
+	files  files.Storage
 }
 
 func NewService(pool *pgxpool.Pool, mailer Mailer, log *slog.Logger, secret string, set Settings) *Service {
@@ -77,11 +94,26 @@ func NewService(pool *pgxpool.Pool, mailer Mailer, log *slog.Logger, secret stri
 	}
 }
 
+// WithStorage lets the service store and link profile pictures.
+func (s *Service) WithStorage(storage files.Storage) *Service {
+	s.files = storage
+	return s
+}
+
+// present fills in the fields that are computed rather than stored.
+func (s *Service) present(u users.User) users.User {
+	if s.files != nil && u.AvatarKey != "" {
+		u.AvatarURL = s.files.URL(u.AvatarKey)
+	}
+	return u
+}
+
 type RegisterInput struct {
 	Name       string
 	Email      string
 	Password   string
 	RememberMe bool
+	Phone      string
 }
 
 type LoginInput struct {
@@ -106,6 +138,10 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (users.User, I
 	if err != nil {
 		return users.User{}, IssuedSession{}, err
 	}
+	phone, err := normalizePhone(in.Phone)
+	if err != nil {
+		return users.User{}, IssuedSession{}, err
+	}
 	passwordHash, err := HashPassword(in.Password)
 	if err != nil {
 		return users.User{}, IssuedSession{}, err
@@ -123,12 +159,22 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (users.User, I
 		if user, err = s.users.Create(ctx, tx, name, email, passwordHash); err != nil {
 			return err
 		}
+		if phone != "" {
+			if err = s.users.SetPhone(ctx, tx, user.ID, phone); err != nil {
+				return err
+			}
+			user.Phone = phone
+		}
 		if issued, err = s.issueSession(ctx, tx, user.ID, in.RememberMe, now); err != nil {
 			return err
 		}
 		return s.store.replaceToken(ctx, tx, verificationTokens, user.ID, s.hasher.sum(verifyToken), now.Add(s.set.VerifyTTL), now)
 	})
 	if errors.Is(err, users.ErrEmailTaken) {
+		// A deleted account keeps its email for good, so say why it can't be used again.
+		if old, lookup := s.users.ByEmail(ctx, s.pool, email); lookup == nil && old.DeletedAt != nil {
+			return users.User{}, IssuedSession{}, ErrAccountDeleted
+		}
 		return users.User{}, IssuedSession{}, ErrEmailTaken
 	}
 	if err != nil {
@@ -136,7 +182,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (users.User, I
 	}
 
 	s.sendVerification(ctx, user, verifyToken)
-	return user, issued, nil
+	return s.present(user), issued, nil
 }
 
 func (s *Service) Login(ctx context.Context, in LoginInput) (users.User, IssuedSession, error) {
@@ -152,8 +198,13 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (users.User, IssuedS
 		return users.User{}, IssuedSession{}, ErrInvalidCredentials
 	}
 
+	// Only someone who knows the password learns the account was deleted.
+	if user.DeletedAt != nil {
+		return users.User{}, IssuedSession{}, ErrAccountDeleted
+	}
+
 	issued, err := s.issueSession(ctx, s.pool, user.ID, in.RememberMe, s.now())
-	return user, issued, err
+	return s.present(user), issued, err
 }
 
 func (s *Service) Logout(ctx context.Context, rawToken string) error {
@@ -170,7 +221,7 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (Identity, 
 		return Identity{}, err
 	}
 
-	id := Identity{User: row.User, ExpiresAt: row.ExpiresAt}
+	id := Identity{User: s.present(row.User), ExpiresAt: row.ExpiresAt}
 	if now.Sub(row.LastUsedAt) >= s.set.TouchAfter {
 		id.ExpiresAt = now.Add(s.ttl(row.RememberMe))
 		if err := s.store.touchSession(ctx, s.pool, row.ID, now, id.ExpiresAt); err != nil {
@@ -228,6 +279,9 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	}
 	if err != nil {
 		return err
+	}
+	if user.DeletedAt != nil {
+		return nil
 	}
 
 	now := s.now()
@@ -388,4 +442,146 @@ func validateRegistration(in RegisterInput) (name, email string, err error) {
 		return "", "", err
 	}
 	return name, email, nil
+}
+
+type ProfileInput struct {
+	Name  *string
+	Phone *string
+}
+
+// UpdateProfile changes the fields the customer sent and leaves the rest alone.
+func (s *Service) UpdateProfile(ctx context.Context, userID string, in ProfileInput) (users.User, error) {
+	current, err := s.users.ByID(ctx, s.pool, userID)
+	if err != nil {
+		return users.User{}, err
+	}
+	name, phone := current.Name, current.Phone
+	if in.Name != nil {
+		name = strings.TrimSpace(*in.Name)
+		if n := utf8.RuneCountInString(name); n < 1 || n > 100 {
+			return users.User{}, validationError("Name must be between 1 and 100 characters")
+		}
+	}
+	if in.Phone != nil {
+		if phone, err = normalizePhone(*in.Phone); err != nil {
+			return users.User{}, err
+		}
+	}
+	if err := s.users.UpdateProfile(ctx, s.pool, userID, name, phone, s.now()); err != nil {
+		return users.User{}, err
+	}
+	return s.reload(ctx, userID)
+}
+
+// SetAvatar stores a new profile picture and removes the one it replaces.
+func (s *Service) SetAvatar(ctx context.Context, userID string, data []byte) (users.User, error) {
+	if s.files == nil {
+		return users.User{}, apierror.ErrInternal
+	}
+	if len(data) > AvatarMaxBytes {
+		return users.User{}, validationError("The picture must be 2 MB or smaller")
+	}
+	ext, ok := avatarTypes[http.DetectContentType(data)]
+	if !ok {
+		return users.User{}, validationError("Please upload a JPG, PNG or WebP picture")
+	}
+
+	current, err := s.users.ByID(ctx, s.pool, userID)
+	if err != nil {
+		return users.User{}, err
+	}
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return users.User{}, err
+	}
+	key := "avatars/" + userID + "/" + hex.EncodeToString(raw) + ext
+	if err := s.files.Put(ctx, key, bytes.NewReader(data)); err != nil {
+		return users.User{}, err
+	}
+	if err := s.users.SetAvatarKey(ctx, s.pool, userID, key, s.now()); err != nil {
+		_ = s.files.Delete(ctx, key)
+		return users.User{}, err
+	}
+	s.discardAvatar(ctx, current.AvatarKey)
+	return s.reload(ctx, userID)
+}
+
+func (s *Service) RemoveAvatar(ctx context.Context, userID string) (users.User, error) {
+	current, err := s.users.ByID(ctx, s.pool, userID)
+	if err != nil {
+		return users.User{}, err
+	}
+	if err := s.users.SetAvatarKey(ctx, s.pool, userID, "", s.now()); err != nil {
+		return users.User{}, err
+	}
+	s.discardAvatar(ctx, current.AvatarKey)
+	return s.reload(ctx, userID)
+}
+
+func (s *Service) discardAvatar(ctx context.Context, key string) {
+	if key == "" || s.files == nil {
+		return
+	}
+	if err := s.files.Delete(ctx, key); err != nil {
+		s.log.Error("remove old avatar", "key", key, "error", err)
+	}
+}
+
+// DeleteAccount closes a customer's own account after they confirm with their password.
+// Nothing is erased: the row stays, so the email can never be registered again, and
+// bringing the account back needs an administrator. Every session ends immediately.
+func (s *Service) DeleteAccount(ctx context.Context, userID, password string) error {
+	user, err := s.users.ByID(ctx, s.pool, userID)
+	if err != nil {
+		return err
+	}
+	if user.Role != users.RoleCustomer {
+		return ErrNotCustomer
+	}
+	if !VerifyPassword(password, user.PasswordHash) {
+		return ErrWrongPassword
+	}
+
+	now := s.now()
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.users.MarkDeleted(ctx, tx, userID, now); err != nil {
+			return err
+		}
+		if err := s.store.revokeAllSessions(ctx, tx, userID, now); err != nil {
+			return err
+		}
+		return s.store.clearTokens(ctx, tx, userID)
+	})
+}
+
+func (s *Service) reload(ctx context.Context, userID string) (users.User, error) {
+	u, err := s.users.ByID(ctx, s.pool, userID)
+	return s.present(u), err
+}
+
+// normalizePhone keeps digits and a leading plus, and accepts the usual separators.
+// A phone number is optional, so an empty value is fine and clears it.
+func normalizePhone(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	var b strings.Builder
+	digits := 0
+	for i, r := range raw {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+			digits++
+		case r == '+' && i == 0:
+			b.WriteRune(r)
+		case r == ' ' || r == '-' || r == '(' || r == ')' || r == '.':
+		default:
+			return "", validationError("Phone number is not valid")
+		}
+	}
+	if digits < 7 || digits > 15 {
+		return "", validationError("Phone number is not valid")
+	}
+	return b.String(), nil
 }

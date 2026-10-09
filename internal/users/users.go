@@ -34,8 +34,13 @@ type User struct {
 	Email         string    `json:"email"`
 	Role          Role      `json:"role"`
 	EmailVerified bool      `json:"email_verified"`
+	Phone         string    `json:"phone"`
+	AvatarURL     string    `json:"avatar_url,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	PasswordHash  string    `json:"-"`
+	AvatarKey     string    `json:"-"`
+	// DeletedAt is set when the customer deleted the account. The row is kept on purpose.
+	DeletedAt *time.Time `json:"-"`
 }
 
 var (
@@ -43,7 +48,7 @@ var (
 	ErrEmailTaken = errors.New("email already registered")
 )
 
-const columns = `id::text, name, email::text, role::text, email_verified, created_at, password_hash`
+const columns = `id::text, name, email::text, role::text, email_verified, created_at, password_hash, phone, avatar_key, deleted_at`
 
 type Repository struct{}
 
@@ -51,7 +56,7 @@ func NewRepository() *Repository { return &Repository{} }
 
 func scan(row pgx.Row) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.EmailVerified, &u.CreatedAt, &u.PasswordHash)
+	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.EmailVerified, &u.CreatedAt, &u.PasswordHash, &u.Phone, &u.AvatarKey, &u.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -122,5 +127,27 @@ func (r *Repository) SetPassword(ctx context.Context, db database.DBTX, id, pass
 
 func (r *Repository) SetRole(ctx context.Context, db database.DBTX, id string, role Role, at time.Time) error {
 	_, err := db.Exec(ctx, `UPDATE users SET role = $2::user_role, updated_at = $3 WHERE id = $1`, id, string(role), at)
+	return err
+}
+
+func (r *Repository) UpdateProfile(ctx context.Context, db database.DBTX, id, name, phone string, at time.Time) error {
+	_, err := db.Exec(ctx, `UPDATE users SET name = $2, phone = $3, updated_at = $4 WHERE id = $1`, id, name, phone, at)
+	return err
+}
+
+func (r *Repository) SetPhone(ctx context.Context, db database.DBTX, id, phone string) error {
+	_, err := db.Exec(ctx, `UPDATE users SET phone = $2 WHERE id = $1`, id, phone)
+	return err
+}
+
+// SetAvatarKey stores the picture's storage key, or clears it with an empty key.
+func (r *Repository) SetAvatarKey(ctx context.Context, db database.DBTX, id, key string, at time.Time) error {
+	_, err := db.Exec(ctx, `UPDATE users SET avatar_key = $2, updated_at = $3 WHERE id = $1`, id, key, at)
+	return err
+}
+
+// MarkDeleted closes an account without removing the row. The email stays reserved forever.
+func (r *Repository) MarkDeleted(ctx context.Context, db database.DBTX, id string, at time.Time) error {
+	_, err := db.Exec(ctx, `UPDATE users SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL`, id, at)
 	return err
 }

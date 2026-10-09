@@ -1115,6 +1115,71 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: ["Auth"]
+      summary: "Change the signed-in customer's name or phone number. An empty phone clears it."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                phone: {type: string}
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    delete:
+      tags: ["Auth"]
+      summary: "Delete the signed-in customer's own account after confirming the password. The account is closed, not erased: the email stays reserved and every session ends. An administrator is needed to bring it back."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: {type: string}
+      responses:
+        '204':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403':
+          description: Staff, rider and admin accounts cannot delete themselves.
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /api/v1/auth/me/avatar:
+    post:
+      tags: ["Auth"]
+      summary: "Upload a profile picture (JPG, PNG or WebP, up to 2 MB) in the \"image\" form field."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    delete:
+      tags: ["Auth"]
+      summary: "Remove the profile picture."
+      x-access: customer
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
   /api/v1/auth/register:
     post:
       tags: ["Auth"]
@@ -1131,6 +1196,7 @@ paths:
                 email: {type: string}
                 password: {type: string}
                 remember_me: {type: boolean}
+                phone: {type: string, description: "Optional. Used only to contact the customer about an order."}
       responses:
         '201':
           description: Success.
