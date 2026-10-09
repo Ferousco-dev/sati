@@ -1,16 +1,20 @@
 import type { Metadata, Viewport } from "next";
 // @ts-ignore: CSS module import for side effects
 import "./globals.css";
-import SmoothScroll from "@/components/SmoothScroll";
-import Magnetic from "@/components/Magnetic";
+import SmoothScroll from "@/components/SmoothScroll/SmoothScroll";
+import Magnetic from "@/components/Magnetic/Magnetic";
 import { StoreProvider } from "@/lib/store";
-import CartDrawer from "@/components/CartDrawer";
+import CartDrawer from "@/components/CartDrawer/CartDrawer";
 import { ConsentProvider } from "@/lib/consent";
 import { PwaProvider } from "@/lib/pwa";
 import { ToastProvider } from "@/components/ui/Toast";
-import WhatsAppButton from "@/components/WhatsAppButton";
-import OrderFab from "@/components/OrderFab";
-import ConsentBar from "@/components/ConsentBar";
+import { AuthProvider } from "@/lib/auth";
+import VerifyBanner from "@/components/VerifyBanner/VerifyBanner";
+import WhatsAppButton from "@/components/WhatsAppButton/WhatsAppButton";
+import OrderFab from "@/components/OrderFab/OrderFab";
+import ConsentBar from "@/components/ConsentBar/ConsentBar";
+import InstalledAppShell from "@/components/InstalledAppShell/InstalledAppShell";
+import PwaPrompts from "@/components/PwaPrompts/PwaPrompts";
 import { getSiteContent, getStoreInfo } from "@/lib/content/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -62,15 +66,19 @@ export default async function RootLayout({
         <ConsentProvider>
           <PwaProvider>
             <ToastProvider>
+              <AuthProvider>
               <StoreProvider>
                 <SmoothScroll />
                 <Magnetic />
-                {children}
+                <VerifyBanner />
+                <InstalledAppShell>{children}</InstalledAppShell>
                 <CartDrawer />
                 <WhatsAppButton number={store.whatsapp_number} />
                 <OrderFab />
                 <ConsentBar />
+                <PwaPrompts />
               </StoreProvider>
+              </AuthProvider>
             </ToastProvider>
           </PwaProvider>
         </ConsentProvider>

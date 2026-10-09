@@ -1,0 +1,149 @@
+/* Only what the checkout form styles in order.css don't already cover. */
+.order-form__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.auth__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--dark-grey);
+}
+
+.auth__link {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.auth__link:hover {
+  color: var(--dark-orange);
+}
+
+.auth__switch {
+  margin: 1.25rem 0 0;
+  color: var(--dark-grey);
+  font-size: 0.95rem;
+}
+
+.auth__ok {
+  margin: 0;
+  color: var(--dark-grey);
+  line-height: 1.5;
+}
+
+/* Soft email-verification banner, sits under the fixed nav and never blocks anything. */
+.verify-banner {
+  position: fixed;
+  top: var(--nav-height);
+  inset-inline: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem var(--page-gutter);
+  background: var(--black);
+  color: var(--white);
+  font-size: 0.9rem;
+}
+
+html.has-verify-banner body {
+  padding-top: var(--verify-banner-h);
+}
+
+.verify-banner button {
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 3rem;
+  background: var(--orange);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.verify-banner button:disabled {
+  opacity: 0.6;
+}
+
+.verify-banner__close {
+  background: transparent !important;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Account menu in the top bar */
+.nav-account {
+  position: relative;
+  flex: none;
+}
+
+.nav-account__button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.9rem 0.25rem 0.25rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.18);
+  border-radius: 6.25rem;
+  background: var(--white);
+  color: var(--black);
+  font-weight: 600;
+}
+
+.nav-account__avatar {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--white);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nav-account__name {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-account__menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 13rem;
+  padding: 0.5rem;
+  background: var(--white);
+  border: 1px solid rgba(var(--heading-rgb), 0.12);
+  border-radius: 0.75rem;
+  box-shadow: 0 1rem 2.5rem rgba(var(--heading-rgb), 0.15);
+}
+
+.nav-account__item {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.9rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--black);
+  font: inherit;
+  text-align: left;
+}
+
+.nav-account__item:hover {
+  background: rgba(var(--heading-rgb), 0.06);
+  color: var(--orange);
+}

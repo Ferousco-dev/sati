@@ -1,0 +1,186 @@
+/* Things that float above the page: WhatsApp, the mobile order bar, the consent bar and the announcement strip. */
+
+/* WhatsApp */
+.wa-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background-color: #25d366;
+  color: #ffffff;
+  box-shadow: 0 0.5rem 1.5rem rgba(var(--heading-rgb), 0.28);
+  transition:
+    transform 0.3s var(--ease-out),
+    bottom 0.3s var(--ease-out);
+}
+
+.wa-fab:hover {
+  transform: scale(1.08);
+}
+
+.wa-fab:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.wa-fab svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+/* Order button, every screen size. It sits under the WhatsApp button. */
+@media screen {
+  html.has-order-fab .wa-fab {
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .order-fab {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    z-index: 900;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: var(--cta);
+    color: var(--white);
+    box-shadow: 0 0.5rem 1.5rem rgba(var(--heading-rgb), 0.28);
+    transition:
+      transform 0.3s var(--ease-out),
+      opacity 0.3s;
+  }
+
+  .order-fab:active {
+    background-color: var(--cta-hover);
+    transform: scale(0.96);
+  }
+
+  .order-fab:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+  }
+
+  .order-fab.is-hidden {
+    transform: scale(0.6);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .order-fab svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+.order-fab__count {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.375rem;
+  height: 1.375rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Consent bar */
+.consent {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 950;
+  width: min(26rem, calc(100vw - 2.5rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background-color: var(--surface);
+  color: var(--heading);
+  box-shadow: 0 0.75rem 2.5rem rgba(var(--heading-rgb), 0.2);
+  animation: consent-rise 0.5s var(--ease-out);
+}
+
+@media (max-width: 767px) {
+  .consent {
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  html.has-order-fab .consent {
+    right: 5.25rem;
+  }
+}
+
+.consent__title {
+  margin: 0 0 0.375rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.consent__text {
+  margin: 0 0 1rem;
+  color: var(--body);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.consent__text a {
+  color: var(--primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.consent__actions {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.consent__actions .ui-btn {
+  flex: 1;
+}
+
+@keyframes consent-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+/* Announcement strip */
+.announce {
+  margin-top: var(--nav-height);
+  padding: 0.625rem var(--page-gutter);
+  background-color: var(--primary);
+  color: var(--white);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.announce a {
+  margin-left: 0.5rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.announce + .hero .hero__media {
+  margin-top: 0.75rem;
+}
+

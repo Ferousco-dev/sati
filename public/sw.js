@@ -1,6 +1,6 @@
 // SATI service worker.
 // It keeps the app installable and makes pictures and scripts load fast on repeat visits.
-// It never stores anything from /api, so personal data is never kept on the device.
+// Only the explicitly public catalog API responses are cached. Personal API data is never stored.
 
 const VERSION = "v1";
 const SHELL_CACHE = `sati-shell-${VERSION}`;
@@ -12,7 +12,9 @@ self.addEventListener("install", (event) => {
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.add(OFFLINE_URL))
-      .then(() => self.skipWaiting()),
+      .then(() => {
+        if (!self.registration.active) return self.skipWaiting();
+      }),
   );
 });
 
@@ -35,11 +37,13 @@ self.addEventListener("message", (event) => {
   if (event.data === "skip-waiting") self.skipWaiting();
 });
 
-function isStaticAsset(url) {
+function isStaticAsset(url, request) {
   return (
+    request.destination === "image" ||
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/images/") ||
     url.pathname.startsWith("/icons/") ||
+    /\.(?:avif|gif|jpe?g|png|svg|webp)$/i.test(url.pathname) ||
     /\.(?:woff2?|ttf|otf)$/.test(url.pathname)
   );
 }
@@ -50,10 +54,12 @@ async function staleWhileRevalidate(request) {
   const cached = await cache.match(request);
   const refresh = fetch(request)
     .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
+      if (response.ok || response.type === "opaque") {
+        cache.put(request, response.clone()).catch(() => {});
+      }
       return response;
     })
-    .catch(() => cached);
+    .catch(() => cached || Response.error());
   return cached || refresh;
 }
 
@@ -62,17 +68,33 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
+  const sameOrigin = url.origin === self.location.origin;
+  if (!sameOrigin && request.destination !== "image") return;
+  const isPublicCatalog =
+    sameOrigin &&
+    (url.pathname === "/api/v1/products" || url.pathname === "/api/v1/categories");
+  if (sameOrigin && url.pathname.startsWith("/api/") && !isPublicCatalog) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(async () => (await caches.match(OFFLINE_URL)) || Response.error()),
+      fetch(request)
+        .then(async (response) => {
+          if (url.pathname === "/menu" && response.ok) {
+            const cache = await caches.open(SHELL_CACHE);
+            await cache.put("/menu", response.clone()).catch(() => {});
+          }
+          return response;
+        })
+        .catch(async () =>
+          (await caches.match(request, { ignoreSearch: true })) ||
+          (await caches.match(OFFLINE_URL)) ||
+          Response.error(),
+        ),
     );
     return;
   }
 
-  if (isStaticAsset(url)) {
+  if (isPublicCatalog || isStaticAsset(url, request)) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });

@@ -6,6 +6,8 @@ export type User = {
   email: string;
   role: Role;
   email_verified: boolean;
+  phone: string;
+  avatar_url?: string;
   created_at: string;
 };
 

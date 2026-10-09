@@ -1,0 +1,198 @@
+.installed-app {
+  min-height: 100dvh;
+}
+
+.installed-appbar {
+  position: sticky;
+  z-index: 70;
+  top: 0;
+  display: flex;
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+  align-items: center;
+  justify-content: space-between;
+  padding: env(safe-area-inset-top, 0px) 1rem 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  background: var(--surface, #fff);
+}
+
+.installed-appbar__brand,
+.installed-appbar__actions,
+.installed-appbar__account {
+  display: inline-flex;
+  align-items: center;
+}
+
+.installed-appbar__brand {
+  gap: 0.6rem;
+  color: var(--heading, #0f172a);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.installed-appbar__mark {
+  display: grid;
+  width: 2rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--primary, #268adc);
+  color: #fff;
+  font-family: var(--font-display, sans-serif);
+  font-size: 1.25rem;
+}
+
+.installed-appbar__actions {
+  gap: 0.75rem;
+}
+
+.installed-appbar__account {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--cta, #0f3b63);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.installed-appbar__account:focus-visible,
+.installed-appbar__brand:focus-visible {
+  outline: 2px solid var(--primary, #268adc);
+  outline-offset: 2px;
+}
+
+.installed-appbar__avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.installed-app__content {
+  min-height: 100dvh;
+  padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.installed-app .nav,
+.installed-app .site-footer,
+.installed-app .footer {
+  display: none !important;
+}
+
+body:has(.installed-tabs) .order-fab,
+body:has(.installed-tabs) .wa-fab {
+  display: none !important;
+}
+
+html.has-order-fab:has(.installed-tabs) .consent {
+  bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.installed-tabs {
+  position: fixed;
+  z-index: 90;
+  inset: auto 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: 4.25rem;
+  padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+  background: var(--surface, #fff);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.07);
+}
+
+.installed-tabs__item {
+  position: relative;
+  display: flex;
+  min-width: 44px;
+  min-height: 44px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--body, #475569);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.installed-tabs__item:focus-visible {
+  outline: 2px solid var(--primary, #268adc);
+  outline-offset: -2px;
+}
+
+.installed-tabs__item.is-active {
+  color: var(--cta, #0f3b63);
+}
+
+.installed-tabs__icon {
+  position: relative;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+}
+
+.installed-tabs__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.installed-tabs__badge {
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 99px;
+  background: #c23b2a;
+  color: #fff;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.installed-splash {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: var(--background, #f8fafc);
+  color: var(--heading, #0f172a);
+  animation: installed-splash-out 180ms ease-out 350ms forwards;
+  pointer-events: none;
+}
+
+.installed-splash__mark {
+  display: grid;
+  width: 3.75rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--primary, #268adc);
+  color: #fff;
+  font-family: var(--font-display, sans-serif);
+  font-size: 2rem;
+}
+
+.installed-splash__name {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@keyframes installed-splash-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .installed-splash { animation-duration: 1ms; animation-delay: 0ms; }
+}

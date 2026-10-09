@@ -1,28 +1,210 @@
-.account {
-  width: 100%;
-  max-width: 46rem;
+/* ---------- Page ---------- */
+.account-page {
+  min-height: 70vh;
+  padding: calc(var(--nav-height) + 3rem) var(--page-gutter) 5rem;
+  background: var(--background);
+}
+
+.account-page--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-wrap {
+  max-width: 68rem;
   margin: 0 auto;
-  padding: 2.5rem;
+}
+
+.account-intro {
+  margin-bottom: 2rem;
+}
+
+.account-layout {
+  display: grid;
+  grid-template-columns: 19rem 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.account-card {
   background: var(--white);
   border-radius: 1.25rem;
   box-shadow: 0 1.5rem 4rem rgba(var(--heading-rgb), 0.1);
 }
 
-.account__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
+.account-card--narrow {
+  width: 100%;
+  max-width: 30rem;
+  padding: 2.5rem;
+  text-align: center;
 }
 
-.account__email {
-  margin: 0.5rem 0 0;
+/* ---------- Profile ---------- */
+.account-profile {
+  position: sticky;
+  top: calc(var(--nav-height) + 1.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.account-profile__avatar {
+  display: grid;
+  place-items: center;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  text-transform: uppercase;
+}
+
+.account-photo {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.account-photo__edit {
+  position: absolute;
+  right: -0.15rem;
+  bottom: -0.15rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  background: var(--black);
+  color: var(--white);
+  transition: background-color 0.25s ease;
+}
+
+.account-photo__edit:hover {
+  background: var(--orange);
+}
+
+.account-photo__edit:disabled {
+  opacity: 0.6;
+}
+
+.account-photo__edit svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.account-photo__input {
+  display: none;
+}
+
+.account-profile__hint {
+  margin: 0 0 1rem;
   color: var(--dark-grey);
+  font-size: 0.8rem;
+}
+
+.account-profile__link--quiet {
+  margin: 0 0 1rem;
+  color: var(--dark-grey);
+  font-weight: 500;
+}
+
+.account-edit {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.account-profile__name {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.account-profile__email {
+  margin: 0.4rem 0 1rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--dark-grey);
+  font-size: 0.95rem;
+}
+
+.account-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.account-badge.is-ok {
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--dark-orange);
+}
+
+.account-badge.is-pending {
+  background: rgba(251, 191, 36, 0.25);
+  color: var(--black);
+}
+
+.account-profile__link {
+  margin-top: 0.6rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--orange);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.account-profile__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  width: 100%;
+  margin: 1.5rem 0;
+  padding: 1.25rem 0;
+  border-block: 1px solid rgba(var(--heading-rgb), 0.12);
+}
+
+.account-profile__wide {
+  grid-column: 1 / -1;
+}
+
+.account-profile__meta dt {
+  color: var(--dark-grey);
+  font-size: 0.8rem;
+}
+
+.account-profile__meta dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+.account__edit {
+  width: 100%;
+  margin-bottom: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  border: none;
+  border-radius: 3rem;
+  background: var(--black);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background-color 0.25s ease;
+}
+
+.account__edit:hover {
+  background: var(--orange);
 }
 
 .account__signout {
+  width: 100%;
   border: 1px solid rgba(var(--heading-rgb), 0.2);
   background: none;
   padding: 0.55rem 1.1rem;
@@ -35,19 +217,95 @@
   background: rgba(var(--heading-rgb), 0.06);
 }
 
-.account__count {
+/* ---------- Delete account ---------- */
+.account-danger {
+  --danger: #b42318;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(180, 35, 24, 0.25);
+}
+
+.account-danger__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  color: var(--danger);
+}
+
+.account-danger__text {
   margin: 0 0 1rem;
-  font-weight: 600;
   color: var(--dark-grey);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.account-danger__button {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--danger);
+  border-radius: 3rem;
+  background: var(--white);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.account-danger__button:hover {
+  background: var(--danger);
+  color: var(--white);
+}
+
+.order-form__submit--danger {
+  background: #b42318;
+}
+
+.order-form__submit--danger:hover {
+  background: #912018;
+}
+
+.account-links {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.account-links a {
+  padding: 0.7rem 0.25rem;
+  border-bottom: 1px solid rgba(var(--heading-rgb), 0.08);
+  font-weight: 600;
+  text-align: left;
+}
+
+.account-links a:hover {
+  color: var(--orange);
+}
+
+.account-orders__bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.account-orders__bar .account-orders__title {
+  margin: 0;
+}
+
+/* ---------- Orders ---------- */
+.account-orders__title {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
 }
 
 .account__empty {
-  padding: 2rem 0;
+  padding: 3rem 1.5rem;
   text-align: center;
   color: var(--dark-grey);
 }
 
 .account__empty p {
+  margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -62,8 +320,9 @@
 }
 
 .record {
-  border: 1px solid rgba(var(--heading-rgb), 0.14);
-  border-radius: 1rem;
+  background: var(--white);
+  border-radius: 1.25rem;
+  box-shadow: 0 1.5rem 4rem rgba(var(--heading-rgb), 0.1);
   overflow: hidden;
 }
 
@@ -151,8 +410,31 @@
   color: var(--white);
 }
 
+@media (max-width: 991px) {
+  .account-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .account-profile {
+    position: static;
+  }
+}
+
 @media (max-width: 600px) {
-  .account {
+  .account-card--narrow {
     padding: 1.5rem;
+  }
+
+  .record__head {
+    flex-wrap: wrap;
+  }
+
+  .record__date {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .record__total {
+    margin-left: auto;
   }
 }

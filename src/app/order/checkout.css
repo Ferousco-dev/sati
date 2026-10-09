@@ -1,0 +1,157 @@
+/* Checkout sections. They reuse the order page's inputs, radius, borders and colours. */
+.checkout-section {
+  margin-top: 1.75rem;
+}
+
+.checkout-section__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.checkout-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.checkout-choices--stack {
+  flex-direction: column;
+}
+
+.checkout-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 10rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 0.7rem;
+  background: var(--cream);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkout-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkout-choice small {
+  color: var(--dark-grey);
+  font-weight: 400;
+}
+
+.checkout-choice:hover {
+  border-color: var(--orange);
+}
+
+.checkout-choice:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(var(--cta-rgb), 0.18);
+}
+
+.checkout-choice.is-active {
+  border-color: var(--orange);
+  background: var(--white);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+
+.checkout-choice.is-off {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Plain radio buttons, for lists where a full card per option is too much. */
+.checkout-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.checkout-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: fit-content;
+  padding: 0.4rem 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkout-radio input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--orange);
+  cursor: pointer;
+}
+
+.checkout-notes {
+  display: block;
+  margin-top: 1rem;
+}
+
+.order-form__field select {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 0.7rem;
+  background: var(--cream);
+  font: inherit;
+  color: var(--black);
+}
+
+.order-form__field select:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(var(--cta-rgb), 0.18);
+}
+
+.order-address {
+  margin-top: 0.75rem;
+}
+
+.order-address__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.order-address__actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.order-line__noimg {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 0.5rem;
+  background: var(--border);
+}
+
+.checkout-sum {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  color: var(--dark-grey);
+}
+
+.checkout-hint {
+  margin: 0.5rem 0 1rem;
+  color: var(--dark-grey);
+  font-size: 0.85rem;
+}
+
+.order__place:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .order-address__row {
+    grid-template-columns: 1fr;
+  }
+}

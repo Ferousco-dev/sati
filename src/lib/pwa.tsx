@@ -17,13 +17,18 @@ type InstallPromptEvent = Event & {
 };
 
 type PwaContext = {
+  /** True after standalone mode has been detected on the client. */
+  ready: boolean;
   /** True when the browser can show its own install prompt. */
   canInstall: boolean;
   /** True when the app is running from the home screen. */
   isStandalone: boolean;
   /** iPhones cannot be prompted from code, so they are shown instructions instead. */
   needsIosInstructions: boolean;
+  /** True when a newly installed service worker is waiting to activate. */
+  updateAvailable: boolean;
   install: () => Promise<"accepted" | "dismissed" | "unavailable">;
+  update: () => void;
 };
 
 const Ctx = createContext<PwaContext | null>(null);
@@ -47,10 +52,13 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [isStandalone, setStandalone] = useState(false);
   const [isIos, setIos] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
 
   useEffect(() => {
     setStandalone(detectStandalone());
     setIos(detectIos());
+    setReady(true);
 
     const media = window.matchMedia("(display-mode: standalone)");
     const onDisplayChange = () => setStandalone(detectStandalone());
@@ -68,7 +76,34 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("appinstalled", onInstalled);
 
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      let reloadOnControllerChange = false;
+      const onControllerChange = () => {
+        if (!reloadOnControllerChange) return;
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+      navigator.serviceWorker.register("/sw.js").then((registration) => {
+        if (registration.waiting) setWaitingWorker(registration.waiting);
+
+        registration.addEventListener("updatefound", () => {
+          const installing = registration.installing;
+          installing?.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+              setWaitingWorker(registration.waiting ?? installing);
+            }
+          });
+        });
+
+        return registration;
+      }).catch(() => {});
+
+      return () => {
+        media.removeEventListener("change", onDisplayChange);
+        window.removeEventListener("beforeinstallprompt", onPrompt);
+        window.removeEventListener("appinstalled", onInstalled);
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      };
     }
 
     return () => {
@@ -91,14 +126,27 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
     return outcome;
   }, [prompt]);
 
+  const update = useCallback(() => {
+    if (!waitingWorker) return;
+    const controllerChange = () => {
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", controllerChange, { once: true });
+    waitingWorker.postMessage("skip-waiting");
+    setWaitingWorker(null);
+  }, [waitingWorker]);
+
   const value = useMemo<PwaContext>(
     () => ({
+      ready,
       canInstall: prompt !== null && !isStandalone,
       isStandalone,
       needsIosInstructions: isIos && !isStandalone,
+      updateAvailable: waitingWorker !== null,
       install,
+      update,
     }),
-    [prompt, isStandalone, isIos, install],
+    [ready, prompt, isStandalone, isIos, waitingWorker, install, update],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

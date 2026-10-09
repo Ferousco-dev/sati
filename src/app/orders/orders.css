@@ -1,0 +1,192 @@
+/* Order history and order detail. Cards, spacing and type come from the account and checkout pages. */
+.account-wrap--narrow {
+  max-width: 46rem;
+}
+
+.orders-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+}
+
+.orders-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.25rem 0;
+}
+
+.orders-badges__kind {
+  color: var(--dark-grey);
+  font-size: 0.85rem;
+}
+
+.orders-lines li {
+  justify-content: space-between;
+}
+
+.orders-foot {
+  gap: 0.6rem;
+}
+
+.orders-more {
+  display: block;
+  margin: 1.5rem auto 0;
+  padding-inline: 2rem;
+}
+
+/* ---------- Order detail ---------- */
+.od {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.od-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  color: var(--dark-grey);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.od-back svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.od-back:hover {
+  color: var(--orange);
+}
+
+.od__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.od__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.od__date {
+  color: var(--dark-grey);
+  font-size: 0.9rem;
+}
+
+.od-card {
+  padding: 1.5rem;
+}
+
+.od-card__title {
+  margin: 0 0 0.9rem;
+  font-size: 1.15rem;
+}
+
+.od-notice {
+  padding: 1.25rem 1.5rem;
+  border-left: 4px solid var(--orange);
+}
+
+.od-notice--bad {
+  border-left-color: #b42318;
+}
+
+.od-notice__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.od-notice p {
+  margin: 0 0 0.75rem;
+  color: var(--dark-grey);
+  line-height: 1.5;
+}
+
+.od-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(var(--heading-rgb), 0.08);
+}
+
+.od-sum {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.6rem;
+  color: var(--dark-grey);
+}
+
+.od-sum--total {
+  color: var(--black);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.od-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.od-facts dt {
+  color: var(--dark-grey);
+  font-size: 0.8rem;
+}
+
+.od-facts dd {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.od-facts__wide {
+  grid-column: 1 / -1;
+}
+
+.od-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.od-actions .order-form__submit {
+  margin-top: 0;
+  padding-inline: 1.5rem;
+}
+
+.od-button--quiet {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(var(--heading-rgb), 0.2);
+  border-radius: 3rem;
+  background: var(--white);
+  color: var(--black);
+  font-weight: 600;
+}
+
+.od-button--quiet:hover {
+  background: rgba(var(--heading-rgb), 0.06);
+}
+
+@media (max-width: 600px) {
+  .od-facts {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,7 +1,7 @@
-import SiteNavbar from "@/components/SiteNavbar";
+import SiteNavbar from "@/components/SiteNavbar/SiteNavbar";
 import { getSiteContent } from "@/lib/content/server";
-import OurMenu from "@/components/OurMenu";
-import SiteFooter from "@/components/SiteFooter";
+import OurMenu from "@/components/OurMenu/OurMenu";
+import SiteFooter from "@/components/SiteFooter/SiteFooter";
 
 export const revalidate = 60;
 

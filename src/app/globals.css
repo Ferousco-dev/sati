@@ -96,11 +96,15 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus,
-button:focus-visible,
-a:focus,
-a:focus-visible {
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
   outline: none;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
 .button {

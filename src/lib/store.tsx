@@ -22,19 +22,8 @@ export type MenuItem = {
 
 export type CartLine = MenuItem & { qty: number };
 
-export type Order = {
-  id: string;
-  placedAt: number;
-  lines: CartLine[];
-  total: number;
-};
-
-export type Account = { name: string; email: string };
-
 type State = {
   cart: CartLine[];
-  account: Account | null;
-  orders: Order[];
 };
 
 type Action =
@@ -42,21 +31,19 @@ type Action =
   | { type: "remove"; id: string }
   | { type: "qty"; id: string; qty: number }
   | { type: "clearCart" }
-  | { type: "setAccount"; account: Account }
-  | { type: "signOut" }
-  | { type: "placeOrder"; order: Order }
   | { type: "reorder"; lines: CartLine[] }
   | { type: "hydrate"; state: State };
 
 // Saved as "sati:v1", and only once the visitor has accepted optional storage.
 const KEY = "v1";
 const LEGACY_KEY = "orente:v1";
-const empty: State = { cart: [], account: null, orders: [] };
+const empty: State = { cart: [] };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "hydrate":
-      return action.state;
+      // Only the bag is kept. Older versions also saved names and orders here, which are dropped now.
+      return { cart: Array.isArray(action.state?.cart) ? action.state.cart : [] };
     case "add": {
       const existing = state.cart.find((l) => l.id === action.item.id);
       const cart = existing
@@ -80,12 +67,6 @@ function reducer(state: State, action: Action): State {
     }
     case "clearCart":
       return { ...state, cart: [] };
-    case "setAccount":
-      return { ...state, account: action.account };
-    case "signOut":
-      return { ...state, account: null };
-    case "placeOrder":
-      return { ...state, orders: [action.order, ...state.orders], cart: [] };
     case "reorder": {
       // Merge the order's lines into the current cart, summing quantities.
       let cart = state.cart.map((l) => ({ ...l }));
@@ -103,8 +84,6 @@ function reducer(state: State, action: Action): State {
 
 type Ctx = {
   cart: CartLine[];
-  account: Account | null;
-  orders: Order[];
   count: number;
   total: number;
   add: (item: MenuItem) => void;
@@ -112,9 +91,6 @@ type Ctx = {
   remove: (id: string) => void;
   setQty: (id: string, qty: number) => void;
   clearCart: () => void;
-  setAccount: (account: Account) => void;
-  signOut: () => void;
-  placeOrder: () => Order | null;
   reorder: (lines: CartLine[]) => void;
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
@@ -165,8 +141,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const value: Ctx = {
     cart: state.cart,
-    account: state.account,
-    orders: state.orders,
     count,
     total,
     add: (item) => {
@@ -177,19 +151,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     remove: (id) => dispatch({ type: "remove", id }),
     setQty: (id, qty) => dispatch({ type: "qty", id, qty }),
     clearCart: () => dispatch({ type: "clearCart" }),
-    setAccount: (account) => dispatch({ type: "setAccount", account }),
-    signOut: () => dispatch({ type: "signOut" }),
-    placeOrder: () => {
-      if (!state.cart.length) return null;
-      const order: Order = {
-        id: Math.random().toString(36).slice(2, 8).toUpperCase(),
-        placedAt: Date.now(),
-        lines: state.cart,
-        total,
-      };
-      dispatch({ type: "placeOrder", order });
-      return order;
-    },
     reorder: (lines) => dispatch({ type: "reorder", lines }),
     cartOpen,
     setCartOpen,
